@@ -49,6 +49,21 @@ class MLECurve:
     def negLL(self, params):
         return( -self.llcurve(params))
 
+    def generateBackground(self, xrange, ratio=1.0):
+        xmin = xrange[0]
+        xmax = xrange[1]
+
+        nn = float(self.data.size)
+
+        nnew = nn * ratio
+        
+        print("Adding flat background of", nnew, "points")
+
+        bgdata = np.random.uniform(xmin, xmax, int(nnew))
+
+        self.data = np.append(self.data, bgdata)
+        
+    
     # Then just call minimize on that function using the initial guesses
     # a solid gradient descent mode is probably fine for what we need
     def mleScipy(self):
@@ -193,12 +208,20 @@ class MLECurve:
     
     def kstest(self):
         # Computes the Kolmogorov-Smirnov test statistic for the curve
+        # This is here for completeness, but there are better ones to use for sure
+        # The CDF might be different from the regular CDF for a particular curve type, so this should be
+        # overloaded in that case for any given curve type
         nn = float(len(self.data))
         if(self.isSorted == False):
             self.sortData()
 
         cdfy = self.CDF(self.estimates, self.data)
         ecdfy = np.arange(1, nn+1) / nn
+
+        fig = plt.plot(self.data, cdfy)
+        plt.plot(self.data, ecdfy)
+        plt.show()
+        print("plotted")
 
         dif = np.absolute(cdfy - ecdfy)
         ks = np.amax(dif)
@@ -208,7 +231,7 @@ class MLECurve:
     def verifyMaximum(self):
         # Verify that the solution is a maximum: the second derivative should be negative
         grad2 = self.ddllcurve()
-        print(grad2)
+        #print(grad2)
         result = True
         if(np.any(grad2 >= 0.0)):
             result = False
@@ -467,11 +490,72 @@ class lorentzianCurve(MLECurve):
         kappa = params[0]
         cdf = (1.0/np.pi) * np.arctan( x / kappa ) + 0.5
         return(cdf)
+
+    def halfCDF(self, params, x):
+        # This is the CDF for half curve assuming the centre is at x=0
+        kappa = params[0]
+        cdf = (2.0/np.pi) * np.arctan( x / kappa ) 
+        return(cdf)
+
     
     def Quantile(self, params, p):
         kappa = params[0]
         qn = kappa * np.tan(np.pi * (p - 0.5))
         return(qn)
+
+    
+    def gridECDF(self, dat):
+        # Calculates the empirical CDF on a grid of 100 points
+        xmin = np.amin(dat)
+        xmax = np.amax(dat)
+
+        ns = 100
+        
+        stp = (xmax - xmin)/float(ns)
+
+
+        nn = float(len(dat))
+        xs = np.arange(xmin, xmax, stp)
+
+        print ("siz", xs.size, xmin, xmax, stp, (xmax-xmin)/stp)
+
+        ecdfy = np.zeros_like(xs)
+        
+        for i in range(ns):
+            ecdfy[i] = np.sum( dat < xs[i] ) / nn
+
+            
+        return (xs, ecdfy)
+
+        
+
+        
+
+    def kstest(self):
+        # Overloading the base class ks-test and doing a numerical KS test with two eCDFs
+        nn = float(len(self.data))
+        nni = int(nn)
+        if(self.isSorted == False):
+            self.sortData()
+
+        minx = np.amin(self.data)
+        maxx = np.amax(self.data)
+
+        pmin = self.CDF(self.estimates, minx)
+        pmax = self.CDF(self.estimates, maxx)
+
+        uniform = np.random.uniform(pmin, pmax, nni)
+        synth = self.Quantile(self.estimates, uniform)
+
+        synth = np.sort(synth)
+                    
+        ecdfx, ecdfy = self.gridECDF(self.data) # self.CDF(self.estimates, self.data)
+        #ecdfy = np.arange(1, nn+1) / nn
+        scdfx, scdfy = self.gridECDF(synth)
+        
+        dif = np.absolute(scdfy - ecdfy)
+        ks = np.amax(dif)
+        return(ks)
     
     def generateTestSamples(self, params, xrange, nsamples, verbose=True):
         pmin = self.CDF(params, xrange[0])
@@ -494,7 +578,38 @@ class lorentzianCurve(MLECurve):
         
         
         
-        
+class lorentzianSquaredCurve(MLECurve):
+
+    def CDF(self, params, x):
+        kappa = params[0]
+        ss    = params[1]
+
+        t1 = np.pi * (2.0 + ss)/kappa
+        t2 = (2.0 * ss * x)/(x*x + kappa*kappa)
+        t3 = 2.0 * (2.0 + ss) * np.arctan(x / kappa) / kappa
+
+        cdf = 0.25 * (t1 + t2 + t3)
+        return(cdf)
+
+    def curve(self, params, dat=np.array(None)):
+        kappa = params[0]
+        ss = params[1]
+
+        if(np.any(dat == None)):
+            xx = self.data
+        else:
+            xx = dat
+
+        t1 = 1.0 / (kappa*kappa + xx * xx)
+        t2 = kappa*kappa*ss / (kappa*kappa + xx*xx)**2.0
+        return(t1 + t2)
+
+    def llcurve(self, params):
+        crv = self.curve(params)
+        lg = np.log(crv, out=np.full_like(crv, 1.0E-30), where=(crv!=0)) 
+        return(np.sum(lg))
+
+    
         
         
         
