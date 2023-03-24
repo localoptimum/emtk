@@ -164,12 +164,61 @@ class MLECurve:
         raise NotImplementedError()
         return(None)
 
-    def Quantile(self, params, x):
+    def Quantile(self, params, p):
         # If not overridden, this function will numerically solve for x: CDF(x) - P = 0
+        # so as to determine the value x that corresponds to CDF(x) = P
         # using newton iteration
-        # this is a bit slow so it's always best to provide a quantile function if you can
-        print("WARNING: base class Quantile function called.")
-        return(None)
+        # this could obviously be a bit slower than an analytic expression
+        # so it's always best to provide a quantile function if you can
+
+        ii = 0
+
+        nmax = 20
+
+        dx = 0.0001
+
+        dyr = 1.0
+
+        # Since this is SANS, we will assume x is close to zero!
+        guesses = np.random.uniform(1.0E-4, 0.1, size=20)
+
+        fs = self.CDF(params, guesses)-p
+
+        opt = np.argmin(fs)
+
+        xx = guesses[opt]
+
+        fx = 1.0
+        
+
+        while(ii < nmax and fx > 1.0E-13): # This cutoff was just found by trial and error
+
+            #print("x", xx)
+            
+            fx = self.CDF(params, xx)-p
+            fxp= self.CDF(params, xx+dx)-p
+
+            #print("f", fx)
+            #print("ff", fxp)
+
+            dy = fxp-fx
+            dyr= abs(dy / fx)
+
+            #print("dyr", dyr)
+            
+            fprime = dy/dx
+
+            xx = xx - fx/fprime
+
+            ii = ii + 1
+
+        # Validation that an inverse was found
+
+        if (fx > 1.0E-6):
+            print("WARNING: numerical quantile function possibly failed to converge")
+            print("   CDF(x)-p = ", fx)
+        
+        return(xx)
 
     
     def CDF(self, params, x):
@@ -503,6 +552,9 @@ class lorentzianCurve(MLECurve):
         qn = kappa * np.tan(np.pi * (p - 0.5))
         return(qn)
 
+    def nQuantile(self, params, p):
+        cdf = super().Quantile(params, p)
+        return(cdf)    
     
     def gridECDF(self, dat):
         # Calculates the empirical CDF on a grid of 100 points
