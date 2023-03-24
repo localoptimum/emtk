@@ -157,13 +157,21 @@ class MLECurve:
         
         return(dydp)
     
-    def testSamples(self, params, xrange, nsamples):
-        # Returns a numpy array of random samples from the curve.  
-        # Must be overridden
-        print("ERROR: attempt to generate samples from base class.")
-        raise NotImplementedError()
-        return(None)
 
+
+    def generateTestSamples(self, params, xrange, nsamples, verbose=True):
+        pmin = self.CDF(params, xrange[0])
+        pmax = self.CDF(params, xrange[1])
+            
+        uniform = np.random.uniform(pmin, pmax, nsamples)
+        self.data = self.Quantile(params, uniform)
+        self.setupGuesses()
+        if(verbose):
+            print("Generated", nsamples, "samples using parameters", params)
+
+
+
+    
     def Quantile(self, params, p):
         # If not overridden, this function will numerically solve for x: CDF(x) - P = 0
         # so as to determine the value x that corresponds to CDF(x) = P
@@ -446,15 +454,6 @@ class gaussianCurve(MLECurve):
         qn = mu + sigma * root2 * erfinv(2.0 * p - 1.0)
         return(qn)
     
-    def generateTestSamples(self, params, xrange, nsamples, verbose=True):
-        pmin = self.CDF(params, xrange[0])
-        pmax = self.CDF(params, xrange[1])
-            
-        uniform = np.random.uniform(pmin, pmax, nsamples)
-        self.data = self.Quantile(params, uniform)
-        self.setupGuesses()
-        if(verbose):
-            print("Generated", nsamples, "samples using parameters", params)
 
     def report(self):
         print("Gaussian curve maximum likelihood estimation")
@@ -608,16 +607,6 @@ class lorentzianCurve(MLECurve):
         dif = np.absolute(scdfy - ecdfy)
         ks = np.amax(dif)
         return(ks)
-    
-    def generateTestSamples(self, params, xrange, nsamples, verbose=True):
-        pmin = self.CDF(params, xrange[0])
-        pmax = self.CDF(params, xrange[1])
-            
-        uniform = np.random.uniform(pmin, pmax, nsamples)
-        self.data = self.Quantile(params, uniform)
-        self.setupGuesses()
-        if(verbose):
-            print("Generated", nsamples, "samples using parameters", params)
     
     def report(self):
         print("Lorentzian curve maximum likelihood estimation")
