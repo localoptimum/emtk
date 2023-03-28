@@ -187,6 +187,8 @@ class MLECurve:
 
         dyr = 1.0
 
+        nmax = 15
+
         # Since this is SANS, we will assume x is pretty close to zero!
         guesses = 1.0E-3
 
@@ -200,7 +202,7 @@ class MLECurve:
 
             ii = 0        
 
-            while(ii < nmax and fx > 1.0E-13): # This cutoff was just found by trial and error
+            while(ii < nmax and np.abs(fx) > 1.0E-13): # This cutoff was just found by trial and error
 
                 #print("x", xx)
             
@@ -211,7 +213,7 @@ class MLECurve:
                 #print("ff", fxp)
 
                 dy = fxp-fx
-                dyr= abs(dy / fx)
+                #dyr= abs(dy / fx)
 
                 #print("dyr", dyr)
             
@@ -543,7 +545,7 @@ class lorentzianCurve(MLECurve):
     def halfCDF(self, params, x):
         # This is the CDF for half curve assuming the centre is at x=0
         kappa = params[0]
-        cdf = (2.0/np.pi) * np.arctan( x / kappa ) 
+        cdf = 0.5 + np.arctan( x / kappa ) / np.pi
         return(cdf)
 
     
@@ -626,11 +628,17 @@ class lorentzianSquaredCurve(MLECurve):
         kappa = params[0]
         ss    = params[1]
 
-        t1 = np.pi * (2.0 + ss)/kappa
-        t2 = (2.0 * ss * x)/(x*x + kappa*kappa)
-        t3 = 2.0 * (2.0 + ss) * np.arctan(x / kappa) / kappa
+        x2 = x**2.0
 
-        cdf = 0.25 * (t1 + t2 + t3)
+        pi = np.pi
+        pi2= pi**2.0
+        kappa2 = kappa*2.0
+
+        t1 = 0.5
+        t2 = ss * x * kappa / (pi * (2.0 + ss) * (x2 + kappa2))
+        t3 = np.arctan(x/kappa)/pi
+                                
+        cdf = t1 + t2 + t3
         return(cdf)
 
     def curve(self, params, dat=np.array(None)):
@@ -651,6 +659,21 @@ class lorentzianSquaredCurve(MLECurve):
         lg = np.log(crv, out=np.full_like(crv, 1.0E-30), where=(crv!=0)) 
         return(np.sum(lg))
 
+    def setupGuesses(self):
+        self.guesses = np.array([0.0, 0.0])
+        self.guesses[0] = 1.0/70.0
+        self.guesses[1] = 0.5
+
+
+    def report(self):
+        print("Lorentzian Squared maximum likelihood estimation")
+        print(len(self.data), "data points")
+        print(self.guesses, "as initial guesses (kappa, S)")
+        print(self.estimates, "solution obtained", self.method)
+        print("That a maximum was found is", self.verifyMaximum(), "via second derivative")
+        #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
+
+        
     
         
         
