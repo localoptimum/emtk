@@ -38,7 +38,7 @@ curv = emtk.lorentzianCurve()
 pvalues = np.array([kappa])
 xrange = np.array([0.001, 0.1]) # minimum and maximum Q values (AA-1)
 curv.generateTestSamples(pvalues, xrange, 2000) # generate data points
-curv.generateBackground(xrange, ratio=0.1) # generate a flat 10% bg
+curv.generatebackground(xrange, ratio=0.1) # generate a flat 10% bg
 
 # Fit the data:
 curv.mle() # perform the maximum likelihood estimation 
@@ -68,7 +68,7 @@ class MLECurve:
     Methods: 
         mle : 
             performs maximum likelihood estimation
-        generateBackground : 
+        generatebackground : 
             create a flat, random background on the data
         llcurve : 
             the log-likelihood function of the distribution
@@ -95,8 +95,8 @@ class MLECurve:
         self.data = np.empty(0)
         self.hessian = np.empty(0)
         self.method = "only from guesses"
-        self.forceNumeric = False
-        self.isSorted = False
+        self.forcenumeric = False
+        self.issorted = False
 
     def mle(self):
         """Numerical maximum likelihood estimation from the base class.  Uses
@@ -126,19 +126,19 @@ class MLECurve:
         self.method = "numerically"
 
         while run:
-            y0 = self.dllcurve(self.estimates) # the derivative (to solve)
+            yzero = self.dllcurve(self.estimates) # the derivative (to solve)
             yprime = self.ddllcurve(self.estimates) # the second differential used to find the roots
-            newvals = self.estimates - y0 / yprime # simple Newton iteration
-            fracChange = newvals - self.estimates #self.estimates
+            newvals = self.estimates - yzero / yprime # simple Newton iteration
+            fracchange = newvals - self.estimates #self.estimates
             self.estimates = newvals
             nsteps = nsteps + 1
-            print(self.estimates, y0, yprime)
-            if(nsteps > 50 or fracChange.all() < 1.0E-06):
+            print(self.estimates, yzero, yprime)
+            if(nsteps > 50 or fracchange.all() < 1.0E-06):
                 run=False
 
     # Can use Scipy.optimize.minimize if you want
     # This requires a NEGATIVE log likelihood to minimise
-    def negLL(self, params):
+    def negll(self, params):
         """Negative log-likelihood function, useful for experimenting with
         scipy.optimize.minimize (experimental)
 
@@ -153,12 +153,16 @@ class MLECurve:
 
     # Then just call minimize on that function using the initial guesses
     # a solid gradient descent mode is probably fine for what we need
-    def mleScipy(self):
-        result = minimize(self.negLL, self.guesses, method='BFGS')
+    def mlescipy(self):
+        """Uses scipy minimize to find a numerical root of the negative log-likelihood.
+
+        """
+
+        result = minimize(self.negll, self.guesses, method='BFGS')
         return result
 
 
-    def generateBackground(self, xrange, ratio=1.0):
+    def generatebackground(self, xrange, ratio=1.0):
         """Adds a flat background to the data
         
         Args:
@@ -172,9 +176,9 @@ class MLECurve:
         xmin = xrange[0]
         xmax = xrange[1]
 
-        nn = float(self.data.size)
+        npts = float(self.data.size)
 
-        nnew = nn * ratio
+        nnew = npts * ratio
 
         print("Adding flat background of", nnew, "points")
 
@@ -183,7 +187,11 @@ class MLECurve:
         self.data = np.append(self.data, bgdata)
 
 
-    def llcurve(self, params):
+    def setupGuesses(self):
+        print("ERROR: base class setupGuesses called.")
+        raise NotImplementedError()
+
+    def llcurve(self, _params):
         """Returns the sum of log likelihood curve of the function - this
         must be overridden.  It is the maximum (or minimum of the
         negative) of this curve that we are trying to find.  This
@@ -191,7 +199,7 @@ class MLECurve:
         calculate numerical differentials.
         
         Args:
-            params:
+            _params:
                 numpy array of parameter values (float)
         
         Returns:
@@ -201,7 +209,7 @@ class MLECurve:
 
         print("ERROR: base class log likelihood function called.")
         raise NotImplementedError()
-        return None
+        return 0.0
 
     def dllcurve(self, pars=np.array([None, None])):
         """The first differential of the log-likelihood curve with respect to
@@ -220,7 +228,7 @@ class MLECurve:
 
         """
 
-        if np.any(pars == None):
+        if np.any(pars is None):
             pars = self.estimates
         dydp = np.zeros_like(pars)
 
@@ -241,12 +249,12 @@ class MLECurve:
             parray1[ii] = p1
             parray2[ii] = p2
 
-            y0 = self.llcurve(pars)
-            y1 = self.llcurve(parray1)
-            y2 = self.llcurve(parray2)
+            yzero = self.llcurve(pars)
+            yone = self.llcurve(parray1)
+            ytwo = self.llcurve(parray2)
 
-            dy1 = y1-y0
-            dy2 = y0-y2
+            dy1 = yone-yzero
+            dy2 = yzero-ytwo
 
             dy = 0.5*(dy1 + dy2)
             dp = 0.5*(dp1 + dp2) # probably it must always be that dp1 = dp2, but best be careful
@@ -273,7 +281,7 @@ class MLECurve:
 
         """
 
-        if np.any(pars == None):
+        if np.any(pars is None):
             pars = self.estimates
         dydp = np.zeros_like(pars)
 
@@ -294,12 +302,12 @@ class MLECurve:
             parray1[ii] = p1
             parray2[ii] = p2
 
-            y0 = self.dllcurve(pars)[ii]
-            y1 = self.dllcurve(parray1)[ii]
-            y2 = self.dllcurve(parray2)[ii]
+            yzero = self.dllcurve(pars)[ii]
+            yone = self.dllcurve(parray1)[ii]
+            ytwo = self.dllcurve(parray2)[ii]
 
-            dy1 = y1-y0
-            dy2 = y0-y2
+            dy1 = yone-yzero
+            dy2 = yzero-ytwo
 
             dy = 0.5*(dy1 + dy2)
             dp = 0.5*(dp1 + dp2) # probably dp1 = dp2 always, but best be careful
@@ -341,7 +349,7 @@ class MLECurve:
 
 
 
-    def Quantile(self, params, probs):
+    def Quantile(self, params, p):
         """Returns the quantile function.  This base class performs a
         numerical inverse of the cumulative distribution function
         (CDF).  If possible, it should be overridden with an
@@ -357,13 +365,13 @@ class MLECurve:
             params:
                 numpy array (float) containing the parameters to use 
                 for the quantile calculation
-            probs:
+            p:
                 numpy array (float) of probability values (y-values) to
                 use to determine the corresponding x-values
 
         Returns:
-            numpy array (float) with the same dimensions as probs,
-            containing the x, or Q, values associated with each probs.
+            numpy array (float) with the same dimensions as p,
+            containing the x, or Q, values associated with each p.
 
         """
 
@@ -372,8 +380,6 @@ class MLECurve:
         nprobs= np.size(p)
 
         dx = 0.0001
-
-        dyr = 1.0
 
         nmax = 15
 
@@ -428,7 +434,7 @@ class MLECurve:
 
         print("WARNING: base class CDF function called.")
         raise NotImplementedError()
-        return None
+        return 0.0
 
     def sortData(self):
         """Performs a sort of the data, which is needed for some
@@ -437,7 +443,7 @@ class MLECurve:
         """
 
         self.data = np.sort(self.data)
-        self.isSorted = True
+        self.issorted = True
 
     def adtest(self):
         """Computes the Anderson Darling test statistic for the distribution
@@ -449,7 +455,7 @@ class MLECurve:
         """
 
         nn = float(len(self.data))
-        if self.isSorted == False:
+        if not self.issorted:
             self.sortData()
 
         rev = np.flip(self.data)
@@ -481,7 +487,7 @@ class MLECurve:
         """
 
         nn = float(len(self.data))
-        if self.isSorted == False:
+        if not self.issorted:
             self.sortData()
 
         cdfy = self.CDF(self.estimates, self.data)
@@ -513,7 +519,7 @@ class MLECurve:
             result = False
         return result
 
-    def uncertainty(self):
+#    def uncertainty(self):
         """This will calculate the Cramer-Rao bound from the Fisher
         Information.  It has not been fully implemented yet.
 
@@ -521,9 +527,9 @@ class MLECurve:
 
         # We have much of this information already, as part of the
         # maximum likelihood estimation process
-        diag = self.ddllcurve() # these are the diagonal elements of the hessian matrix
-        rt = np.sqrt(fisher2)
-        return 1.0/rt
+        #diag = self.ddllcurve() # these are the diagonal elements of the hessian matrix
+        #rt = np.sqrt(fisher2)
+        #return 1.0/rt
 
 
     def plotFit(self, logarithmic=True, nbins=50):
@@ -549,7 +555,7 @@ class MLECurve:
         lw = np.amin(self.data)
         hi = np.amax(self.data)
 
-        if np.any(self.estimates == None):
+        if np.any(self.estimates is None):
             linecolor = 'red'
             params = self.guesses
         else:
@@ -568,7 +574,7 @@ class MLECurve:
         # The histogram is shifted by half a bin width of course, when
         # we want to plot the centre values on the linear error bar
         # plot
-        if logarithmic == False:
+        if logarithmic is False:
             rl = np.roll(hbins,-1)
             xvals = 0.5*(hbins + rl)
             xvals = np.delete(xvals,-1)
@@ -579,7 +585,7 @@ class MLECurve:
         yvals=hst[0]
 
         hnorm = np.sum(yvals)
-        if not np.any(params == None):
+        if not np.any(params is None):
             fitvals = self.curve(self.estimates, xvals)
             fnorm = np.sum(fitvals)
             fitvals = fitvals * hnorm/fnorm
@@ -587,9 +593,9 @@ class MLECurve:
         fig,ax = plt.subplots()
         ax.errorbar(xvals, yvals, errors, fmt='o', mfc='none')
 
-        if not np.any(params == None):
+        if not np.any(params is None):
             ax.plot(xvals, fitvals, color=linecolor)
-        if logarithmic==True:
+        if logarithmic is True:
             plt.yscale('log')
             plt.xscale('log')
         ax.set_xlabel('Q (Å-1)')
@@ -665,11 +671,12 @@ class gaussianCurve(MLECurve):
 
         mu = params[0]
         sigma = params[1]
-        if np.any(dat == None):
+        if np.any(dat is None):
             xx = self.data
         else:
             xx = dat
-        normf = (1.0 / (sigma * np.sqrt(2.0*np.pi))) * np.exp( -( ((xx-mu)**2.0)/ (2.0 * sigma**2.0)))
+        normf = (1.0 / (sigma * np.sqrt(2.0*np.pi))) * \
+            np.exp( -( ((xx-mu)**2.0)/ (2.0 * sigma**2.0)))
         return normf
 
     def llcurve(self, params):
@@ -686,7 +693,8 @@ class gaussianCurve(MLECurve):
         """
 
         normf = self.curve(params)
-        lg = np.log(normf, out=np.full_like(normf, 1.0E-30), where=(normf!=0)) # this stops warnings trying to do log(0.0)
+        # this stops warnings trying to do log(0.0):
+        lg = np.log(normf, out=np.full_like(normf, 1.0E-30), where= normf!=0)
         return np.sum(lg)
 
     def dllcurveAnalytic(self, params=np.array([None, None])):
@@ -704,7 +712,7 @@ class gaussianCurve(MLECurve):
 
         """
 
-        if np.any(params == None):
+        if np.any(params is None):
             params = self.estimates
 
         mu = params[0]
@@ -714,7 +722,7 @@ class gaussianCurve(MLECurve):
         d1 = np.sum( -2.0 * (mu - data)/sigma**2.0 )
         d2 = np.sum( -1.0/sigma + ((self.data - mu)**2.0) / sigma**3.0 )
 
-        return ( np.array([d1, d2]))
+        return np.array([d1, d2])
 
     def ddllcurveAnalytic(self, params=np.array([None, None])):
         """Analytical second derivative of the log likelihood function.
@@ -729,9 +737,9 @@ class gaussianCurve(MLECurve):
             A numpy array containing the second partial derivatives with 
             respect to mu and sigma
 
-        """ 
+        """
 
-        if np.any(params == None):
+        if np.any(params is None):
             params = self.estimates
 
         mu = params[0]
@@ -742,14 +750,14 @@ class gaussianCurve(MLECurve):
         dd2 = np.sum( (1.0/sigma**2.0) - 3.0*((data-mu)**2.0) /sigma**4.0 )
 
 
-        return ( np.array([dd1, dd2]))
+        return np.array([dd1, dd2])
 
     def setupGuesses(self):
         """Creates initial parameter guesses to begin the numerical solution.
 
         """
-
-        self.guesses = np.array([np.mean(self.data), 0.0]) # This is actually the analytic solution for mu
+        # This is actually the analytic solution for mu:
+        self.guesses = np.array([np.mean(self.data), 0.0])
 
         # now generate a random sample over sigma and pick the best one as the initial estimate
         mindata = np.amin(self.data)
@@ -826,7 +834,7 @@ class gaussianCurve(MLECurve):
         print(self.guesses, "as initial guesses (mu, sigma)")
         print(self.estimates, "solution obtained", self.method)
 
-        if (self.verifyMaximum()):
+        if self.verifyMaximum():
             derivStr = "a maximum"
         else:
             derivStr = "not a maximum"
@@ -904,7 +912,7 @@ class lorentzianCurve(MLECurve):
         """
 
         kappa = params[0]
-        if np.any(dat == None):
+        if np.any(dat is None):
             xx = self.data
         else:
             xx = dat
@@ -917,7 +925,8 @@ class lorentzianCurve(MLECurve):
         """
 
         lorf = self.curve(params)
-        lg = np.log(lorf, out=np.full_like(lorf, 1.0E-30), where=(lorf!=0)) # this stops warnings trying to do log(0.0)
+        # this stops warnings trying to do log(0.0)
+        lg = np.log(lorf, out=np.full_like(lorf, 1.0E-30), where= lorf!=0 )
         return np.sum(lg)
 
     def dllcurve(self, params=np.array([None])):
@@ -926,14 +935,14 @@ class lorentzianCurve(MLECurve):
 
         """
 
-        if np.any(params == None):
+        if np.any(params is None):
             params = self.estimates
 
         kappa = params[0]
         data2 = self.data**2.0
 
         grad = np.sum( (1.0/kappa) - 2.0 * kappa / (kappa**2.0 + data2))
-        return ( np.array([grad]))
+        return np.array([grad])
 
     def ddllcurve(self, params=np.array([None])):
         """The analytical second derivative of the log-likelihood of a
@@ -941,15 +950,16 @@ class lorentzianCurve(MLECurve):
 
         """
 
-        if np.any(params == None):
+        if np.any(params is None):
             params = self.estimates
 
         kappa = params[0]
         data2 = self.data**2.0
 
-        grad = np.sum( -(1.0 / kappa**2.0) + (4.0*kappa**2.0 / (kappa**2.0 + data2)**2.0) - 2.0/(kappa**2.0 + data2))
+        grad = np.sum( -(1.0 / kappa**2.0) +\
+                       (4.0*kappa**2.0 / (kappa**2.0 + data2)**2.0) - 2.0/(kappa**2.0 + data2))
 
-        return ( np.array([grad]))
+        return np.array([grad])
 
     def CDF(self, params, x):
 
@@ -967,7 +977,7 @@ class lorentzianCurve(MLECurve):
         cdf = 0.5 + np.arctan( x / kappa ) / np.pi
         return cdf
 
-    
+
     def Quantile(self, params, p):
         kappa = params[0]
         qn = kappa * np.tan(np.pi * (p - 0.5))
@@ -975,7 +985,7 @@ class lorentzianCurve(MLECurve):
 
     def nQuantile(self, params, p):
         cdf = super().Quantile(params, p)
-        return cdf    
+        return cdf
 
     def gridECDF(self, dat):
         # Calculates the empirical CDF on a grid of 100 points
@@ -1007,7 +1017,7 @@ class lorentzianCurve(MLECurve):
         # Overloading the base class ks-test and doing a numerical KS test with two eCDFs
         nn = float(len(self.data))
         nni = int(nn)
-        if self.isSorted == False:
+        if self.issorted is False:
             self.sortData()
 
         minx = np.amin(self.data)
@@ -1020,7 +1030,7 @@ class lorentzianCurve(MLECurve):
         synth = self.Quantile(self.estimates, uniform)
 
         synth = np.sort(synth)
-                    
+
         ecdfx, ecdfy = self.gridECDF(self.data) # self.CDF(self.estimates, self.data)
         #ecdfy = np.arange(1, nn+1) / nn
         scdfx, scdfy = self.gridECDF(synth)
@@ -1071,7 +1081,7 @@ class lorentzianSquaredCurve(MLECurve):
         pi = np.pi
 
 
-        if np.any(dat == None):
+        if np.any(dat is None):
             xx = self.data
         else:
             xx = dat
@@ -1084,7 +1094,7 @@ class lorentzianSquaredCurve(MLECurve):
 
     def llcurve(self, params):
         crv = self.curve(params)
-        lg = np.log(crv, out=np.full_like(crv, 1.0E-30), where=(crv!=0)) 
+        lg = np.log(crv, out=np.full_like(crv, 1.0E-30), where= crv!=0 )
         return np.sum(lg)
 
     def setupGuesses(self):
@@ -1124,7 +1134,7 @@ class hardSphereCurve(MLECurve):
         A = params[0]
         R = params[1]
 
-        if np.any(dat == None):
+        if np.any(dat is None):
             xx = self.data
         else:
             xx = dat
@@ -1135,7 +1145,8 @@ class hardSphereCurve(MLECurve):
     def llcurve(self, params):
         # Return the sum of the log likelihood for the curve shape
         hrd = self.curve(params)
-        lg = np.log(hrd, out=np.full_like(hrd, 1.0E-30), where=(hrd!=0)) # this stops warnings trying to do log(0.0)
+        # this stops warnings trying to do log(0.0)
+        lg = np.log(hrd, out=np.full_like(hrd, 1.0E-30), where= hrd!=0)
         return np.sum(lg)
 
 
@@ -1148,4 +1159,3 @@ class hardSphereCurve(MLECurve):
 #  P value tests
 #  Goodness of fit metrics - "Is the fit good, or valid?"
 #  Bayesian information criterion - "Which is the best model that fits my data"
-
