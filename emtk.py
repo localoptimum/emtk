@@ -228,7 +228,7 @@ class MLECurve:
 
         """
 
-        if np.any(pars is None):
+        if np.any(pars == None):
             pars = self.estimates
         dydp = np.zeros_like(pars)
 
@@ -281,7 +281,7 @@ class MLECurve:
 
         """
 
-        if np.any(pars is None):
+        if np.any(pars == None):
             pars = self.estimates
         dydp = np.zeros_like(pars)
 
@@ -375,7 +375,7 @@ class MLECurve:
 
         """
 
-        p = np.array(probs, ndmin=1) # probs might be a single value or an array of probabilities
+        p = np.array(p, ndmin=1) # probs might be a single value or an array of probabilities
 
         nprobs= np.size(p)
 
@@ -555,7 +555,7 @@ class MLECurve:
         lw = np.amin(self.data)
         hi = np.amax(self.data)
 
-        if np.any(self.estimates is None):
+        if np.any(self.estimates == None):
             linecolor = 'red'
             params = self.guesses
         else:
@@ -585,15 +585,15 @@ class MLECurve:
         yvals=hst[0]
 
         hnorm = np.sum(yvals)
-        if not np.any(params is None):
-            fitvals = self.curve(self.estimates, xvals)
+        if not np.any(params == None):
+            fitvals = self.curve(params, xvals)
             fnorm = np.sum(fitvals)
             fitvals = fitvals * hnorm/fnorm
 
         fig,ax = plt.subplots()
         ax.errorbar(xvals, yvals, errors, fmt='o', mfc='none')
 
-        if not np.any(params is None):
+        if not np.any(params == None):
             ax.plot(xvals, fitvals, color=linecolor)
         if logarithmic is True:
             plt.yscale('log')
@@ -671,7 +671,7 @@ class gaussianCurve(MLECurve):
 
         mu = params[0]
         sigma = params[1]
-        if np.any(dat is None):
+        if np.any(dat == None):
             xx = self.data
         else:
             xx = dat
@@ -712,7 +712,7 @@ class gaussianCurve(MLECurve):
 
         """
 
-        if np.any(params is None):
+        if np.any(params == None):
             params = self.estimates
 
         mu = params[0]
@@ -739,7 +739,7 @@ class gaussianCurve(MLECurve):
 
         """
 
-        if np.any(params is None):
+        if np.any(params == None):
             params = self.estimates
 
         mu = params[0]
@@ -906,16 +906,17 @@ class lorentzianCurve(MLECurve):
 
         MLECurve.mle(self)
 
-    def curve(self, params, dat=np.array(None)):
+    def curve(self, params, dat=np.array([None])):
         """Returns the basic likelihood curve for a Lorentzian function.
 
         """
 
+        xx = dat
+        
         kappa = params[0]
-        if np.any(dat is None):
+        if np.any(dat == None):
             xx = self.data
-        else:
-            xx = dat
+
         lorf = (kappa / np.pi) * 1.0 / (xx**2.0 + kappa**2.0)
         return lorf
 
@@ -935,7 +936,7 @@ class lorentzianCurve(MLECurve):
 
         """
 
-        if np.any(params is None):
+        if np.any(params == None):
             params = self.estimates
 
         kappa = params[0]
@@ -950,7 +951,7 @@ class lorentzianCurve(MLECurve):
 
         """
 
-        if np.any(params is None):
+        if np.any(params == None):
             params = self.estimates
 
         kappa = params[0]
@@ -1081,7 +1082,7 @@ class lorentzianSquaredCurve(MLECurve):
         pi = np.pi
 
 
-        if np.any(dat is None):
+        if np.any(dat == None):
             xx = self.data
         else:
             xx = dat
@@ -1134,7 +1135,7 @@ class hardSphereCurve(MLECurve):
         A = params[0]
         R = params[1]
 
-        if np.any(dat is None):
+        if np.any(dat == None):
             xx = self.data
         else:
             xx = dat
