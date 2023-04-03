@@ -56,6 +56,10 @@ from scipy.special import erfinv
 from scipy.optimize import minimize
 from scipy.special import sici
 
+def sinintegral(theta):
+    si, ci = sici(theta)
+    return si
+
 class MLECurve:
     """Base class for maximum likelihood estimation.  
 
@@ -98,7 +102,7 @@ class MLECurve:
         self.forcenumeric = False
         self.issorted = False
 
-    def mle(self):
+    def mle(self, verbose = False):
         """Numerical maximum likelihood estimation from the base class.  Uses
         Newton's method.  Derived classes can (should) override this
         method if there exists closed analytical forms for estimators,
@@ -109,7 +113,8 @@ class MLECurve:
         Results are stored in the base class estimates attribute.
 
         Args:
-            None
+            verbose:
+                (optional) whether to print diagnostic information.
 
         Returns:
             Nothing.  May need a status return code eventually.
@@ -132,7 +137,8 @@ class MLECurve:
             fracchange = newvals - self.estimates #self.estimates
             self.estimates = newvals
             nsteps = nsteps + 1
-            print(self.estimates, yzero, yprime)
+            if verbose:
+                print(self.estimates, yzero, yprime, fracchange)
             if(nsteps > 50 or fracchange.all() < 1.0E-06):
                 run=False
 
@@ -337,14 +343,23 @@ class MLECurve:
 
         """
 
-        pmin = self.CDF(params, xrng[0])
-        pmax = self.CDF(params, xrng[1])
+
+        pmin = self.cdf(params, xrng[0])
+        pmax = self.cdf(params, xrng[1])
 
         uniform = np.random.uniform(pmin, pmax, nsamples)
         self.data = self.Quantile(params, uniform)
+
+        # Some functions (e.g. hard spheres) have unusual features
+        # Remove nan and inf values from the array
+        self.data = self.data[~np.isnan(self.data)]
+        self.data = self.data[~np.isinf(self.data)]
+
+        npass = np.size(self.data)
+        
         self.setupGuesses()
         if verbose:
-            print("Generated", nsamples, "samples using parameters", params)
+            print("Generated", npass, "samples using parameters", params)
 
 
 
@@ -400,8 +415,8 @@ class MLECurve:
 
                 #print("x", xx)
 
-                fx = self.CDF(params, xx[pp])-p[pp]
-                fxp= self.CDF(params, xx[pp]+dx)-p[pp]
+                fx = self.cdf(params, xx[pp])-p[pp]
+                fxp= self.cdf(params, xx[pp]+dx)-p[pp]
 
                 #print("f", fx)
                 #print("ff", fxp)
@@ -421,18 +436,18 @@ class MLECurve:
 
             if fx > 1.0E-6:
                 print("WARNING: numerical quantile function possibly failed to converge")
-                print("   CDF(x)-p = ", fx)
+                print("   cdf(x)-p = ", fx)
 
         return xx
 
 
-    def CDF(self, params, x):
+    def cdf(self, params, x):
         """Returns the cumulative distribution function of f(x) from -inf to
         x.  This function must be overridden.
 
         """
 
-        print("WARNING: base class CDF function called.")
+        print("WARNING: base class cdf function called.")
         raise NotImplementedError()
         return 0.0
 
@@ -464,8 +479,8 @@ class MLECurve:
         # see
 #https://stackoverflow.com/questions/15792552/numpy-scipy-equivalent-of-r-ecdfxx-function
         frac = (2.0*np.arange(1, nn+1) - 1) / nn
-        t1 = np.log(self.CDF(self.estimates, self.data))
-        t2 = np.log(1.0 - self.CDF(self.estimates, rev))
+        t1 = np.log(self.cdf(self.estimates, self.data))
+        t2 = np.log(1.0 - self.cdf(self.estimates, rev))
 
         SS = np.sum( frac * (t1 + t2) )
 
@@ -490,7 +505,7 @@ class MLECurve:
         if not self.issorted:
             self.sortData()
 
-        cdfy = self.CDF(self.estimates, self.data)
+        cdfy = self.cdf(self.estimates, self.data)
         ecdfy = np.arange(1, nn+1) / nn
 
         fig = plt.plot(self.data, cdfy)
@@ -564,6 +579,9 @@ class MLECurve:
 
         slic = (hi-lw)/(nbins+1)
 
+        #print(self.data)
+        #print(hi, lw, slic)
+        
         #if(logarithmic ==False):
         hbins = np.arange(lw, hi, slic)
         #else:
@@ -773,7 +791,7 @@ class gaussianCurve(MLECurve):
         bestEstimate = np.argmax(guessVals)
         self.guesses[1] = sigmas[bestEstimate]
 
-    def CDF(self, params, x):
+    def cdf(self, params, x):
         """Analytical computation of the cumulative distribution function
         (CDF) of a gaussian distribution.
 
@@ -962,7 +980,7 @@ class lorentzianCurve(MLECurve):
 
         return np.array([grad])
 
-    def CDF(self, params, x):
+    def cdf(self, params, x):
 
         """ksdlk sdlkds ds
 
@@ -972,7 +990,7 @@ class lorentzianCurve(MLECurve):
         cdf = (1.0/np.pi) * np.arctan( x / kappa ) + 0.5
         return cdf
 
-    def halfCDF(self, params, x):
+    def halfcdf(self, params, x):
         # This is the CDF for half curve assuming the centre is at x=0
         kappa = params[0]
         cdf = 0.5 + np.arctan( x / kappa ) / np.pi
@@ -988,7 +1006,7 @@ class lorentzianCurve(MLECurve):
         cdf = super().Quantile(params, p)
         return cdf
 
-    def gridECDF(self, dat):
+    def gridEcdf(self, dat):
         # Calculates the empirical CDF on a grid of 100 points
         xmin = np.amin(dat)
         xmax = np.amax(dat)
@@ -1024,17 +1042,17 @@ class lorentzianCurve(MLECurve):
         minx = np.amin(self.data)
         maxx = np.amax(self.data)
 
-        pmin = self.CDF(self.estimates, minx)
-        pmax = self.CDF(self.estimates, maxx)
+        pmin = self.cdf(self.estimates, minx)
+        pmax = self.cdf(self.estimates, maxx)
 
         uniform = np.random.uniform(pmin, pmax, nni)
         synth = self.Quantile(self.estimates, uniform)
 
         synth = np.sort(synth)
 
-        ecdfx, ecdfy = self.gridECDF(self.data) # self.CDF(self.estimates, self.data)
+        ecdfx, ecdfy = self.gridEcdf(self.data) # self.CDF(self.estimates, self.data)
         #ecdfy = np.arange(1, nn+1) / nn
-        scdfx, scdfy = self.gridECDF(synth)
+        scdfx, scdfy = self.gridEcdf(synth)
 
         dif = np.absolute(scdfy - ecdfy)
         ks = np.amax(dif)
@@ -1055,7 +1073,7 @@ class lorentzianCurve(MLECurve):
 
 class lorentzianSquaredCurve(MLECurve):
 
-    def CDF(self, params, x):
+    def cdf(self, params, x):
         kappa = params[0]
         ss    = params[1]
 
@@ -1109,6 +1127,7 @@ class lorentzianSquaredCurve(MLECurve):
         print(len(self.data), "data points")
         print(self.guesses, "as initial guesses (kappa, S)")
         print(self.estimates, "solution obtained", self.method)
+        print("R =", 1.0/self.estimates[0])
         print("That a maximum was found is", self.verifyMaximum(), "via second derivative")
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
 
@@ -1121,26 +1140,25 @@ class lorentzianSquaredCurve(MLECurve):
 
 
 class hardSphereCurve(MLECurve):
+    def init(self, data):
+        self.nparams=1
 
-    def CDF(self, params, x):
-        A = params[0]
-        R = params[1]
-        cdf = (A*(-3 - 5.0*R**2.0 * x**2.0 + 2.0*np.pi*R**5.0 * x**5.0 + \
-                  (3.0 - R**2.0 * x**2.0 + 2.0*R**4.0 * x**4.0) * np.cos(2.0*R*x) - \
-                  R*x*(6.0 + R**2.0 * x**2.0)*np.sin(2.0*R*x) + 4.0*R**5.0 * x**5.0 \
-                  *sinintegral(2.0*R*x)))/(30.0*R**6.0 * x**5.0)
-
+        if len(data) > 0:
+            self.setupGuesses()
+    
     def curve(self, params, dat=np.array(None)):
         # Return the basic likelihood curve
-        A = params[0]
-        R = params[1]
+        R = params[0]
 
         if np.any(dat == None):
             xx = self.data
         else:
             xx = dat
 
-        hrd = (A*(-(Q*R*np.cos(Q*R)) + np.sin(Q*R))**2.0)/(Q**6.0 * R**6.0)
+        xr = xx * R
+        xr6= xr ** 6.0
+            
+        hrd = 15.0 * R * ( np.sin(xr) - xr * np.cos(xr))**2.0  / (2.0 * np.pi * xr6)
         return hrd
 
     def llcurve(self, params):
@@ -1149,6 +1167,46 @@ class hardSphereCurve(MLECurve):
         # this stops warnings trying to do log(0.0)
         lg = np.log(hrd, out=np.full_like(hrd, 1.0E-30), where= hrd!=0)
         return np.sum(lg)
+
+    def cdf(self, params, x):
+        R = params[0]
+
+        xr = x * R
+        xr2 = xr ** 2.0
+        xr4 = xr2 ** 2.0
+        xr5 = xr ** 5.0
+        
+        cdft = (-3.0 - 5.0 * xr2 + 
+            2.0 * np.pi * xr5 + (3.0 - xr2 + 2.0 * xr4) * np.cos(2.0 * xr) + 
+            xr * (6.0 + xr2) *  np.sin(2.0 * xr) + 
+            4.0 * xr5 * sinintegral(2.0 * xr))
+        cdfb = (4.0 * np.pi * xr5)
+        return cdft / cdfb
+
+    
+    def setupGuesses(self):
+        self.guesses = np.array([90.0])
+
+    
+    def report(self):
+        """Prints a brief report of the MLE fitting results.
+
+        """
+
+        print("Hard sphere model maximum likelihood estimation")
+        print(np.size(self.data), "data points")
+        print(self.guesses, "as initial guesses (R, Angstroms)")
+        print(self.estimates, "solution obtained", self.method)
+
+        if self.verifyMaximum():
+            derivStr = "a maximum"
+        else:
+            derivStr = "not a maximum"
+
+        print("The second derivative indicates that this is", derivStr)
+        #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
+
+            
 
 
 
