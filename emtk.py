@@ -343,9 +343,18 @@ class MLECurve:
 
         """
 
+        xmin = xrng[0]
+        xmax = xrng[1]
 
-        pmin = self.cdf(params, xrng[0])
-        pmax = self.cdf(params, xrng[1])
+        # Check that these minima and maxima are correct, swap them if not
+        if xmin > xmax:
+            tmp = xmin
+            xmin = xmax
+            xmax = tmp
+
+        
+        pmin = self.cdf(params, xmin)
+        pmax = self.cdf(params, xmax)
 
         uniform = np.random.uniform(pmin, pmax, nsamples)
         self.data = self.Quantile(params, uniform)
@@ -355,7 +364,35 @@ class MLECurve:
         self.data = self.data[~np.isnan(self.data)]
         self.data = self.data[~np.isinf(self.data)]
 
+        # Remove spurious points that exceed the x-range
+        mask = self.data > xmax
+        self.data = self.data[~mask]
+        mask = self.data < xmin
+        self.data = self.data[~mask]
+
+        
+        # We might now have fewer points than were asked for.  Create
+        # additional points until we are done
         npass = np.size(self.data)
+
+        ntries = 0
+
+        while npass < nsamples:
+            nneeded = nsamples - npass
+            uniform = np.random.uniform(pmin, pmax, nneeded)
+            extra = self.Quantile(params, uniform)
+            extra = extra[~np.isnan(extra)]
+            extra = extra[~np.isinf(extra)]
+            mask = extra > xmax
+            extra = extra[~mask]
+            mask = extra < xmin
+            extra = extra[~mask]
+
+            nnew = np.size(extra)
+            ntries = ntries + 1
+            self.data = np.append(self.data, extra)
+            npass = np.size(self.data)
+            
         
         self.setupGuesses()
         if verbose:
@@ -580,7 +617,7 @@ class MLECurve:
         slic = (hi-lw)/(nbins+1)
 
         #print(self.data)
-        #print(hi, lw, slic)
+        print(hi, lw, slic)
         
         #if(logarithmic ==False):
         hbins = np.arange(lw, hi, slic)
