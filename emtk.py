@@ -77,7 +77,7 @@ class MLECurve:
         generatebackground : 
             create a flat, random background on the data
         llcurve : 
-            the log-likelihood function of the distribution
+            the log-likelihood function of the distribution/
         dllcurve : 
             the first derivative of the log-likelihood function with
             respect to each parameter
@@ -467,13 +467,18 @@ class MLECurve:
 
                 fprime = dy/dx
 
+                # If the gradient is zero, then we reach a flat point and cannot continue
+                if fprime == 0.0:
+                    break
+                
+                
                 xx[pp] = xx[pp] - fx/fprime
 
                 ii = ii + 1
 
                 # Validation that an inverse was found
 
-            if fx > 1.0E-6:
+            if fx > 1.0E-2:
                 print("WARNING: numerical quantile function possibly failed to converge")
                 print("   cdf(x)-p = ", fx)
 
@@ -1264,6 +1269,12 @@ class porodCurve(MLECurve):
     def mle(self):
         """Analytical MLE of gaussian distribution parameters, using 
            powerlaw package.
+
+           The exponent is calculated analytically, whilst the Qmin
+           parameter must be optimised numerically.
+        
+           See https://arxiv.org/pdf/0706.1062.pdf
+           and https://pypi.org/project/powerlaw/
 
         """
 
