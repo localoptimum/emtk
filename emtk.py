@@ -98,6 +98,7 @@ class MLECurve:
         self.nparams=0
         self.estimates = np.array([None])
         self.guesses = np.array([None])
+        self.variances = np.array([None])
         self.data = np.empty(0)
         self.hessian = np.empty(0)
         self.method = "only from guesses"
@@ -967,6 +968,7 @@ class lorentzianCurve(MLECurve):
         """
 
         MLECurve.mle(self)
+        self.calcVariances()
 
     def curve(self, params, dat=np.array([None])):
         """Returns the basic likelihood curve for a Lorentzian function.
@@ -1106,14 +1108,42 @@ class lorentzianCurve(MLECurve):
         print("Lorentzian curve maximum likelihood estimation")
         print(len(self.data), "data points")
         print(self.guesses, "as initial guess (kappa)")
+
+        
+        if not np.any(self.variances) == None :
+            errstr = " +/- " + np.array2string(self.variances[0]) + "?"
+        else:
+            errstr = ""
+            
+        print(self.estimates, errstr, "solution obtained", self.method)
+
         print(self.estimates, "solution obtained", self.method)
         print("That a maximum was found is", self.verifyMaximum(), "via second derivative")
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
 
 
+    def calcVariances(self, crit = 1.0):
+        #crit = 1.96 (95% or roughly 2 sigma, is also a common option)
+        
+        secondDiff = self.ddllcurve(self.estimates)
+        fisherI = -secondDiff/self.data.size
+        
+        variance = 1.0 / fisherI
+        self.variances = np.array([variance])
+        
+        
 
 
 
+
+
+
+
+
+
+
+
+        
 
 class lorentzianSquaredCurve(MLECurve):
 
@@ -1241,7 +1271,7 @@ class hardSphereCurve(MLECurve):
         print(np.size(self.data), "data points")
         print(self.guesses, "as initial guesses (R, Angstroms)")
         print(self.estimates, "solution obtained", self.method)
-
+        
         if self.verifyMaximum():
             derivStr = "a maximum"
         else:
@@ -1249,7 +1279,7 @@ class hardSphereCurve(MLECurve):
 
         print("The second derivative indicates that this is", derivStr)
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
-
+            
             
 
 
