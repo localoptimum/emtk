@@ -1123,6 +1123,41 @@ class lorentzianCurve(MLECurve):
 
 
     def calcVariances(self, crit = 1.0):
+        '''
+        Calculates the variance of the kappa parameter.
+        For a single parameter curve, as is the case for SANS, this is
+        a simple computation of the inverse of the fisher information.
+        This is the Cramer-Rao bound, the lower bound on the variance of 
+        any unbiased estimator of theta.  It is a 'happy conincidence' that
+        the inverse of the fisher information is the same size as the 
+        sigma of a gaussian distribution of errors, but this comes from the central
+        limit theorem basically, so it all makes sense if you accept the
+        central limit theorem.
+
+        The fisher information here is the "observed fisher information"
+        which I have shamelessly stolen from equation 2.10 in University of
+        Minnesota "Stat 5102 Notes: Fisher Information and Confidence Intervals
+        Using Maximum Likelihood" by Charles J. Geyer, March 2007.
+
+        This function is called automatically at the end of mle(), you don't need to call it.
+
+        TODO:
+            There are not yet any checks as to whether mle() was able to find a 
+            sensible result.  This means that calcVariances() might be unstable 
+            and some sanity checks are probably needed before deployment.
+
+        Parameters:
+            crit:
+                (float, optional) value to scale the sigma by.  1-sigma
+                is the usual error bar size for gaussians.  crit=1.96 would
+                correspond to 2-sigma, 95% confidence range, etc...
+        
+        Returns:
+            Nothing.  But it does store the results in self.variances np.array 
+            for use elsewhere.  If not np.any(self.variances) == None, etc etc
+        
+        '''
+        
         #crit = 1.96 (95% or roughly 2 sigma, is also a common option)
         
         secondDiff = self.ddllcurve(self.estimates)
