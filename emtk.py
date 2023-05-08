@@ -1168,11 +1168,61 @@ class lorentzianCurve(MLECurve):
         
         
 
+    def infer(self, plot=False):
 
+        # Bayesian inference
 
+        # First figure out range of kappa values
+        xrange = np.array( [ np.amin(self.data), np.amax(self.data) ])
+        
+        logmean = np.mean(np.log10( xrange)) 
+        loghw = 0.5*np.std(np.log10(xrange))
+        rrange = np.array([10**(logmean-loghw), 10**(logmean+loghw)])
+        rrange = 1.0/rrange
+        rrange = np.round(rrange)
 
+        #print(rrange)
 
+        rvals = np.arange(rrange[1], rrange[0], 1.0)
 
+        rvals = np.flip(rvals)
+
+        #print(rvals)
+
+        kappas = 1.0 / rvals
+
+        # Now setup prior
+
+        prior = np.full_like(kappas, 0.01)
+        posterior = np.full_like(kappas, 0.01)
+        
+        #print(kappas)
+
+        kappas2 = kappas**2.0
+        
+        for neutron in np.arange(0, self.data.size - 1, 1):
+            posterior = prior * (kappas / np.pi) * 1.0 / (self.data[neutron]**2.0 + kappas2)
+            total = np.sum(posterior)
+            posterior = posterior / total
+            prior = np.copy(posterior)
+
+        centre =  np.sum( posterior * kappas)
+        diffs = (kappas - centre)**2.0
+
+        stddev = np.sqrt( np.sum(diffs*posterior)) 
+        
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(kappas, posterior)
+            ax.set_xlabel('Parameter value')
+            ax.set_ylabel('Inferred probability')
+
+        self.estimates = np.array([centre])
+        self.variances = np.array([stddev])
+        
+        self.method = 'Bayesian inference'
+
+        return self.estimates
 
 
 
