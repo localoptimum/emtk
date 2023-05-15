@@ -119,7 +119,7 @@ class MLECurve:
         '''
         
         if self.kdeobject is None:
-            self.kdeobject = gaussian_kde(self.data)
+            self.kdeobject = gaussian_kde(self.data, bw_method='silverman')
 
         kdevals = self.kdeobject.evaluate(xval)
 
