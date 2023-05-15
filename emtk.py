@@ -633,6 +633,7 @@ class MLECurve:
         #    hbins=np.logspace(np.log10(lw),np.log10(hi), 50)
 
         hst = np.histogram(self.data, bins=hbins)
+      
 
         # The histogram is shifted by half a bin width of course, when
         # we want to plot the centre values on the linear error bar
@@ -653,6 +654,11 @@ class MLECurve:
             fnorm = np.sum(fitvals)
             fitvals = fitvals * hnorm/fnorm
 
+        with open('temp-histo.npy', 'wb') as fl:
+            np.save(fl, xvals)
+            np.save(fl, yvals)
+
+            
         fig,ax = plt.subplots()
         ax.errorbar(xvals, yvals, errors, fmt='o', mfc='none')
 
@@ -1463,6 +1469,11 @@ class porodCurve(MLECurve):
 
         #print("The second derivative indicates that this is", derivStr)
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
+
+
+
+
+
 
 
 
