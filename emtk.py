@@ -65,6 +65,86 @@ def sinintegral(theta):
     return si
 
 
+def kernel_density(data, xvals, normalise=False):
+    '''Performs kernel density estimation using scipy
+        '''
+        
+    kdeobject = gaussian_kde(data, bw_method='silverman')
+
+    kdevals = kdeobject.evaluate(xvals)
+        
+    if normalise:
+        datasum = data.size
+        kdesum = np.sum(kdevals)
+        fact = datasum / kdesum
+        
+        print("data sum:", datasum)
+        print("kde sum:", kdesum)
+        print(fact)
+        
+        kdevals = kdevals * fact
+
+    return kdevals 
+
+
+def kdeBackgroundSubtract(spectrum, background, ratio=None):
+    ''' Uses kernel density estimation to establish the intensity of
+        an arbitrary measured background at each point in the data set.  Then
+        probabilistically removes data points that are correlated with this
+        background.
+
+        Parameters:
+            bg : 
+                numpy array of Q values of background events
+            ratio : 
+                (float, optional) the signal to noise ratio to assume, e.g. the 
+                ratio of monitor counts in the spectra.  If none is given, then 
+                the total counts in each spectrum will be used 
+        
+        Returns:
+            Nothing.  The data set is overwritten.
+        '''
+    
+    if ratio is None :
+        bgsize = background.size
+        dtsize = spectrum.size
+        norm = dtsize/(bgsize+dtsize)
+        ratio = bgsize/dtsize
+    else:
+        norm = ratio
+
+    print("Ratio:", ratio)
+    print("Norm:", norm)
+    print("1-norm:", 1.0-norm)
+
+    # Now for each data point, we identify the probability of rejecting it.
+    # Because of norm, we can just loop over all data points, estimate the
+    # intensity at the data point based on the KDE of the background spectrum
+    # and roll a random number to see if it survives.  If the random number is
+    # below norm * KDE then the event in question dies.
+    
+    dice = np.random.uniform(0.0, 1.0, dtsize)
+    
+    kdebg = kernel_density(background, spectrum)
+
+    kdesp = kernel_density(spectrum, spectrum)
+
+    rejectProbability = kdebg / kdesp
+    
+    keepmask = dice <= rejectProbability*ratio
+    rejectmask = np.invert(keepmask)
+
+    subtracted = spectrum[rejectmask]
+    
+    print("dice", dice)
+    print("x   ", spectrum)
+    print("spec", kdesp)
+    print("back", kdebg)
+    print("rej ", rejectProbability)
+    print("masj", rejectmask)
+    
+    return subtracted
+    
 
 
 class MLECurve:
@@ -111,30 +191,9 @@ class MLECurve:
         self.issorted = False
         self.kdeobject = None
 
-        
-    def kde(self, xval, normalise=False):
-        '''Performs kernel density estimation using scipy
-        NOTE: this is also then not in the end a density estimation
-        since the output data is scaled to match the sum of the measured data
-        '''
-        
-        if self.kdeobject is None:
-            self.kdeobject = gaussian_kde(self.data, bw_method='silverman')
-
-        kdevals = self.kdeobject.evaluate(xval)
-
-        if normalise:
-            datasum = self.data.size
-            kdesum = np.sum(kdevals)
-            fact = datasum / kdesum
-
-            print(datasum)
-            print(kdesum)
-            print(fact)
-        
-            kdevals = kdevals * fact
-
-        return kdevals 
+    def kde(self, xvals):
+        yvals = kernel_density(self.data, xvals)
+        return yvals
 
     def mle(self, verbose = False):
         """Numerical maximum likelihood estimation from the base class.  Uses
@@ -432,51 +491,6 @@ class MLECurve:
         if verbose:
             print("Generated", npass, "samples using parameters", params)
 
-
-    def kdeBGsubtract(self, bg, ratio=None):
-        ''' Uses kernel density estimation to establish the intensity of
-        an arbitrary measured background at each point in the data set.  Then
-        probabilistically removes data points that are correlated with this
-        background.
-
-        Parameters:
-            bg : 
-                numpy array of Q values of background events
-            ratio : 
-                (float, optional) the signal to noise ratio to assume, e.g. the 
-                ratio of monitor counts in the spectra.  If none is given, then 
-                the total counts in each spectrum will be used 
-        
-        Returns:
-            Nothing.  The data set is overwritten.
-        '''
-
-        if ratio is None :
-            bssum = np.sum(bg)
-            dtsum = np.sum(self.data)
-            norm = dtsum / bgsum
-        else:
-            norm = ratio
-
-        # Now for each data point, we identify the probability of rejecting it.
-        # Because of norm, we can just loop over all data points, estimate the
-        # intensity at the data point based on the KDE of the background spectrum
-        # and roll a random number to see if it survives.  If the random number is
-        # below norm * KDE then the event in question dies.
-
-        npts = self.data.size
-        
-        dice = np.random.uniform(0.0, 1.0, npts)
-
-        mask = np.full(npts, True)
-        
-        for nn in range(npts):
-            kdeval = kernelDensityEstimate(bg, self.data[nn])
-            rd = dice[nn]
-            if rd < kdeval*norm:
-                mask[nn] = False
-
-        self.data = np.delete(self.data, mask, axis = 0)
 
         
 
