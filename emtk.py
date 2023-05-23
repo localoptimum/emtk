@@ -1281,30 +1281,41 @@ class lorentzianCurve(MLECurve):
 
         rvals = np.arange(rrange[1], rrange[0], 1.0)
 
-        rvals = np.flip(rvals)
+        revr = np.flip(rvals)
 
         #print(rvals)
 
-        kappas = 1.0 / rvals
+        kappas = 1.0 / revr
 
         # Now setup prior
 
-        prior = np.full_like(kappas, 0.01)
-        posterior = np.full_like(kappas, 0.01)
+        prior = np.full_like(kappas, 1.0/kappas.size)#0.01)
+        posterior = np.full_like(kappas, 1.0/kappas.size)#0.01)
         
         #print(kappas)
 
         kappas2 = kappas**2.0
+
+        # flip into logspace - combining probabilities is then a sum
+        prior = np.log10(prior)
+        posterior = np.log10(posterior)
         
-        for neutron in np.arange(0, self.data.size - 1, 1):
-            posterior = prior * (kappas / np.pi) * 1.0 / (self.data[neutron]**2.0 + kappas2)
-            total = np.sum(posterior)
-            posterior = posterior / total
+        for neutron in np.arange(0, self.data.size, 1):
+            posterior = prior + np.log10((kappas / np.pi) / (self.data[neutron]**2.0 + kappas2))
             prior = np.copy(posterior)
 
-        centre =  np.sum( posterior * kappas)
-        diffs = (kappas - centre)**2.0
+        # Shift the weight distribution down to sensible values and normalise
+        posterior = posterior - np.amax(posterior)
+        posterior = 10.0**posterior
 
+        # normalise the curve (assumes the whole curve has been sampled)
+        total = np.sum(posterior)
+        posterior = posterior / total
+            
+        centre =  np.sum( posterior * kappas) # mean is the weighted sum, gaussian according to central limits
+
+        # Likewise for the standard deviation
+        diffs = (kappas - centre)**2.0
         stddev = np.sqrt( np.sum(diffs*posterior)) 
         
         if plot:
