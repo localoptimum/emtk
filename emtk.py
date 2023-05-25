@@ -744,10 +744,14 @@ class MLECurve:
             fnorm = np.sum(fitvals)
             fitvals = fitvals * hnorm/fnorm
 
+        print(fitvals)
+        print(hst[0])
+        
+            
         with open('temp-histo.npy', 'wb') as fl:
             np.save(fl, xvals)
             np.save(fl, yvals)
-
+            
             
         fig,ax = plt.subplots()
         ax.errorbar(xvals, yvals, errors, fmt='o', mfc='none')
@@ -1296,18 +1300,34 @@ class lorentzianCurve(MLECurve):
 
         kappas2 = kappas**2.0
 
-        # flip into logspace - combining probabilities is then a sum
+
+        ##### Below, the following procedure is done in logspace to simplify, but here it is in
+        # linear space so it's easier to see the mapping to classic bayesian inference
+        # as described on wikipedia
+
+        #for neutron in np.arange(0, self.data.size, 1):
+        #    likelihoods = ((kappas / np.pi) / (self.data[neutron]**2.0 + kappas2))
+        #    sml = np.sum(likelihoods * prior)
+        #    posterior = prior * likelihoods / sml
+        #    prior = np.copy(posterior)
+        
+
+
+        # To simplify, we will flip into logspace, so that combining probabilities is then a sum
+        # Instead of normalising every step, we'll simply normalise everything at the very end
         prior = np.log10(prior)
         posterior = np.log10(posterior)
         
         for neutron in np.arange(0, self.data.size, 1):
             posterior = prior + np.log10((kappas / np.pi) / (self.data[neutron]**2.0 + kappas2))
-            prior = np.copy(posterior)
+            prior = np.copy(posterior) # this is copied over for the next iteration
 
-        # Shift the weight distribution down to sensible values and normalise
+        
+        # Shift the weight distribution down to sensible values around unity, and normalise
         posterior = posterior - np.amax(posterior)
         posterior = 10.0**posterior
 
+        #print(posterior)
         # normalise the curve (assumes the whole curve has been sampled)
         total = np.sum(posterior)
         posterior = posterior / total
@@ -1453,6 +1473,73 @@ class hardSphereCurve(MLECurve):
     def setupGuesses(self):
         self.guesses = np.array([90.0])
 
+
+
+    
+    def infer(self, plot=False):
+
+        # Bayesian inference
+
+        # First figure out range of kappa values
+        xrange = np.array( [ np.amin(self.data), np.amax(self.data) ])
+        
+        logmean = np.mean(np.log10( xrange)) 
+        loghw = 0.5*np.std(np.log10(xrange))
+        rrange = np.array([10**(logmean-loghw), 10**(logmean+loghw)])
+        rrange = 1.0/rrange
+        rrange = np.round(rrange)
+
+        #print(rrange)
+
+        rvals = np.arange(rrange[1], rrange[0], 1.0)
+
+        revr = np.flip(rvals)
+
+        # Now setup prior
+
+        prior = np.full_like(rvals, 1.0/rvals.size)#0.01)
+        posterior = np.full_like(rvals, 1.0/rvals.size)#0.01)
+        
+        # flip into logspace - combining probabilities is then a sum
+        prior = np.log10(prior)
+        posterior = np.log10(posterior)
+        
+        for neutron in np.arange(0, self.data.size, 1):
+            xr = self.data[neutron] * rvals
+            xr6= self.data[neutron] ** 6.0
+            
+            hrd = 15.0 * rvals * ( np.sin(xr) - xr * np.cos(xr))**2.0  / (2.0 * np.pi * xr6)
+            posterior = prior + np.log10(hrd)
+            prior = np.copy(posterior)
+
+        # Shift the weight distribution down to sensible values and normalise
+        posterior = posterior - np.amax(posterior)
+        posterior = 10.0**posterior
+
+        # normalise the curve (assumes the whole curve has been sampled)
+        total = np.sum(posterior)
+        posterior = posterior / total
+            
+        centre =  np.sum( posterior * kappas) # mean is the weighted sum, gaussian according to central limits
+
+        # Likewise for the standard deviation
+        diffs = (kappas - centre)**2.0
+        stddev = np.sqrt( np.sum(diffs*posterior)) 
+        
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(kappas, posterior)
+            ax.set_xlabel('Parameter value')
+            ax.set_ylabel('Inferred probability')
+
+        self.estimates = np.array([centre])
+        self.variances = np.array([stddev])
+        
+        self.method = 'Bayesian inference'
+
+        return self.estimates
+
+
     
     def report(self):
         """Prints a brief report of the MLE fitting results.
@@ -1477,7 +1564,7 @@ class hardSphereCurve(MLECurve):
 
 
 
-
+        
 
 
 
