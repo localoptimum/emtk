@@ -8,24 +8,48 @@ class bayesianHisto:
         self.variances = np.array([None])
         self.datax = np.empty(0)
         self.datay = np.empty(0)
+        self.sigmay = np.empty(0)
 
         self.rvals = np.empty(0)
         self.pr = np.empty(0)
 
         self.psf = None
 
-    def x2(self, yvals, fity):
-        '''Basic calculation of chi-squared'''
+    def x2(self, yvals, fity, sigma=np.array([None])):
+        '''Basic calculation of reduced chi-squared'''
+
+        if sigma[0] is None:
+            sigma = np.full_like(yvals, 1.0)
+            
         diff = yvals-fity
         diff2= diff**2.0
-        frac = diff2/fity
+
+        sigma2 = sigma**2.0
+        
+        frac = diff2/sigma2
         x2 = np.sum(frac)
+        x2 = x2 / fity.size
         return x2
 
     def getfity(self, uj, pij):
         fity = pij.dot(uj)
         return(fity)
 
+    def psf_normalise(self, axis=0):
+        # Ensures that 1 unit of probability equates to one unit
+        # integrated across the spectrum
+
+        if axis == 0:
+            # normalise across columns - this is the correct way with the current arrangement
+            colsums = np.sum(self.psf, axis=0)
+            self.psf = self.psf / colsums
+        else:
+            # normalise across rows
+            rowsums = np.sum(self.psf, axis=1)
+            trans = np.transpose(self.psf)
+            trans = trans / rowsums
+            transtrans = np.transpose(trans)
+            self.psf = transtrans
 
     def errorBarCalculation(self, datay, pij, uj):
         # We just figure out how far the individual bin moves
@@ -81,11 +105,14 @@ class bayesianHisto:
         #    print("errors", errors)
         
         return errors
-            
+
+
+    
     def LR_deconv(self, niter =100, calcErrors=False):
 
         if self.psf is None :
             self.psf, self.rvals = self.calc_psf()
+            self.psf_normalise()
 
         di = self.datay
         pij = self.psf
@@ -102,7 +129,7 @@ class bayesianHisto:
         sumd = np.sum(self.datay)
         fity = fity * sumd/sumf
         
-        chisq = self.x2(self.datay, fity)/self.datay.size
+        chisq = self.x2(self.datay, fity, self.sigmay) #/self.datay.size
     
         #print("x2=", chisq)
     
@@ -135,7 +162,7 @@ class bayesianHisto:
             sumd = np.sum(self.datay)
             fity = fity * sumd/sumf
         
-            chisq = self.x2(self.datay, fity) / self.datay.size
+            chisq = self.x2(self.datay, fity, self.sigmay)# / self.datay.size
         
             #print("x2=", chisq)
         
@@ -336,7 +363,39 @@ class bayesianLorentzian(bayesianHisto):
 
 
 class bayesianSpheres(bayesianHisto):
+
+
+    def hardsphere(self, xx, rr):
+        xr = xx * rr
+        xr6= xr ** 6.0
+        hrd = rr * ( np.sin(xr) - xr * np.cos(xr))**2.0  /  xr6
+        return hrd
+
+    def calc_psf(self):
+        #datax = data[:,0]
+        #datay = data[:,1]
+        # First figure out range of kappa values
+        xrange = np.array( [ np.amin(self.datax), np.amax(self.datax) ])
+        rrange = 1.0/xrange
+        rrange = np.round(np.flip(rrange))
+        #print(xrange)
+        #print(rrange)
+        rvals = np.arange(1.0, 2.0*rrange[1], 1.0)
+        nx = self.datax.size
+        nr = rvals.size
+    
+        #print(nx)
+        #print(nr)
         
+        pmatrix = np.zeros((nx, nr))
+    
+        for i in range(nx):
+            for j in range(nr):
+                pmatrix[i,j] = pmatrix[i,j] + self.hardsphere(self.datax[i], rvals[j])
+        return pmatrix, rvals
+
+    
+    
     def infer(self, plotr=False):
 
         # Bayesian inference
@@ -357,7 +416,7 @@ class bayesianSpheres(bayesianHisto):
         
         self.rvals = np.arange(rrange[0], rrange[1], 1.0)
 
-        self.rvals = np.arange(1.0, 500.0, 5.0)
+        #self.rvals = np.arange(1.0, 500.0, 5.0)
 
         #print(self.rvals)
         # Now setup prior
@@ -468,7 +527,7 @@ class bayesianGuinier(bayesianHisto):
     
         for i in range(nx):
             for j in range(nr):
-               pmatrix[i,j] = pmatrix[i,j] + self.guinier(self.datax[i], 1.0/rvals[j])
+               pmatrix[i,j] = pmatrix[i,j] + self.guinier(self.datax[i], rvals[j])
         return pmatrix, rvals
         
     def infer(self, plotr=False):
