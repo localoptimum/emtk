@@ -10,10 +10,15 @@ class bayesianHisto:
         self.datay = np.empty(0)
         self.sigmay = np.empty(0)
 
+        self.forcedRlimits = np.array([None])
+
         self.rvals = np.empty(0)
         self.pr = np.empty(0)
 
         self.psf = None
+
+    def setRlimits(self, lims):
+        self.forcedRlimits = lims
 
     def x2(self, yvals, fity, sigma=np.array([None])):
         '''Basic calculation of reduced chi-squared'''
@@ -378,12 +383,18 @@ class bayesianSpheres(bayesianHisto):
         #datax = data[:,0]
         #datay = data[:,1]
         # First figure out range of kappa values
-        xrange = np.array( [ np.amin(self.datax), np.amax(self.datax) ])
-        rrange = 1.0/xrange
-        rrange = np.round(np.flip(rrange))
+        if self.forcedRlimits[0] is None:
+            xrange = np.array( [ np.amin(self.datax), np.amax(self.datax) ])
+            rrange = 1.0/xrange
+            rrange = np.round(np.flip(rrange))
+            rvals = np.arange(1.0, 2.0*rrange[1], 1.0)
+
+        else:
+            rrange = self.forcedRlimits
+            rvals = np.arange(rrange[0], rrange[1], rrange[2])
+                    
         #print(xrange)
         #print(rrange)
-        rvals = np.arange(1.0, 2.0*rrange[1], 1.0)
         nx = self.datax.size
         nr = rvals.size
     
