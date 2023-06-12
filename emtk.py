@@ -1540,28 +1540,89 @@ class hardSphereCurve(MLECurve):
         return self.estimates
 
 
+
+
+class guinierCurve(MLECurve):
+    def init(self, data):
+        self.nparams=1
+
+        if len(data) > 0:
+            self.setupGuesses()
+    
     
     def report(self):
         """Prints a brief report of the MLE fitting results.
 
         """
 
-        print("Hard sphere model maximum likelihood estimation")
+        print("Guinier model bayesian inference")
         print(np.size(self.data), "data points")
-        print(self.guesses, "as initial guesses (R, Angstroms)")
-        print(self.estimates, "solution obtained", self.method)
+
+
+    
+    def infer(self, plot=False):
+
+        # Bayesian inference
+
+        # First figure out range of R values
+        xrange = np.array( [ np.amin(self.data), np.amax(self.data) ])
         
-        if self.verifyMaximum():
-            derivStr = "a maximum"
-        else:
-            derivStr = "not a maximum"
+        logmean = np.mean(np.log10( xrange)) 
+        loghw = 0.5*np.std(np.log10(xrange))
+        rrange = np.array([10**(logmean-loghw), 10**(logmean+loghw)])
+        rrange = 1.0/rrange
+        rrange = np.round(rrange)
 
-        print("The second derivative indicates that this is", derivStr)
-        #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
+        #print(rrange)
+
+        rvals = np.arange(rrange[1], rrange[0], 1.0)
+
+        revr = np.flip(rvals)
+
+        # Now setup prior
+
+        prior = np.full_like(rvals, 1.0/rvals.size)#0.01)
+        posterior = np.full_like(rvals, 1.0/rvals.size)#0.01)
+        
+        # flip into logspace - combining probabilities is then a sum
+        prior = np.log10(prior)
+        posterior = np.log10(posterior)
+        
+        for neutron in np.arange(0, self.data.size, 1):
+            xr = self.data[neutron] * rvals
+            xr2= self.data[neutron] ** 2.0
+            gnr= np.exp(-xr2 / 3.0)
+            posterior = prior + np.log10(gnr)
+            prior = np.copy(posterior)
+
+        # Shift the weight distribution down to sensible values and normalise
+        posterior = posterior - np.amax(posterior)
+        posterior = 10.0**posterior
+
+        # normalise the curve (assumes the whole curve has been sampled)
+        total = np.sum(posterior)
+        posterior = posterior / total
             
-            
+        centre =  np.sum( posterior * rvals) # mean is the weighted sum, gaussian according to central limits
 
+        # Likewise for the standard deviation
+        diffs = (rvals - centre)**2.0
+        stddev = np.sqrt( np.sum(diffs*posterior)) 
+        
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(rvals, posterior)
+            ax.set_xlabel('Radius of Gyration (R, Angstroms)')
+            ax.set_ylabel('P(R)')
 
+        self.estimates = np.array([centre])
+        self.variances = np.array([stddev])
+        
+        self.method = 'Bayesian inference'
+
+        return self.estimates
+
+  
 
 
         
