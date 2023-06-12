@@ -188,9 +188,12 @@ class bayesianHisto:
             errors = errors / ujs
         
         if converged:
-            print("Lucy-Richardson fit converged after", iterdone, "iterations.")
+            print("Lucy-Richardson deconvolution converged after", iterdone, "iterations.")
         else:
-            print("Lucy-Richardson fit failed to converge after", iterdone, "iterations.")
+            if chisq <= 10.0:
+                print("Lucy-Richardson deconvolution is approaching convergence after", iterdone, "iterations.")
+            else:
+                print("Lucy-Richardson fit failed to converge after", iterdone, "iterations.")
 
         print("x2=", chisq)
         
