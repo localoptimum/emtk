@@ -663,8 +663,8 @@ class MLECurve:
             fnorm = np.sum(fitvals)
             fitvals = fitvals * hnorm/fnorm
 
-        print(fitvals)
-        print(hst[0])
+        #print(fitvals)
+        #print(hst[0])
         
             
         with open('temp-histo.npy', 'wb') as fl:
@@ -1459,6 +1459,24 @@ class hardSphereCurve(MLECurve):
         return self.estimates
 
 
+    def report(self):
+        """Prints a brief report of the MLE fitting results.
+
+        """
+
+        print("Hard sphere curve maximum likelihood estimation")
+        print(len(self.data), "data points")
+        print(self.guesses, "as initial guess")
+        print(self.estimates, "solution obtained", self.method)
+
+        if self.verifyMaximum():
+            derivStr = "a maximum"
+        else:
+            derivStr = "not a maximum"
+
+        print("The second derivative indicates that this is", derivStr)
+        #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
+    
 
 
 class guinierCurve(MLECurve):
