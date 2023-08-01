@@ -10,6 +10,9 @@ In contrast, event mode requires that we treat each individual event
 uniquely.
 """
 
+from scipy.stats import gaussian_kde
+
+import numpy as np
 
 def kernel_density(data, xvals, normalise=False):
 

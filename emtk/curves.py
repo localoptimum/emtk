@@ -49,6 +49,8 @@ curv.plotFit(logarithmic=True) # display a graph of the fitted data
 
 import numpy as np
 
+import emtk.omegaFunctions as omega
+
 import powerlaw
 
 import matplotlib.pyplot as plt
@@ -111,7 +113,7 @@ class MLECurve:
         self.kdeobject = None
 
     def kde(self, xvals):
-        yvals = kernel_density(self.data, xvals)
+        yvals = omega.kernel_density(self.data, xvals)
         return yvals
 
     def mle(self, verbose = False):
