@@ -8,7 +8,7 @@ class bayesianHisto:
         self.variances = np.array([None])
         self.datax = np.empty(0)
         self.datay = np.empty(0)
-        self.sigmay = np.empty(0)
+        self.sigmay = np.array([None])
 
         self.forcedRlimits = np.array([None])
 
@@ -22,8 +22,8 @@ class bayesianHisto:
 
     def x2(self, yvals, fity, sigma=np.array([None])):
         '''Basic calculation of reduced chi-squared'''
-
-        if sigma[0] is None:
+        
+        if sigma[0] is None: # emtpy array error here?!
             sigma = np.full_like(yvals, 1.0)
             
         diff = yvals-fity
