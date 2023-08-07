@@ -1,3 +1,21 @@
+"""The hard sphere curve is a classic neutron scattering curve that
+has been used countless times for both research on proteins and nano
+technology substances, as well as calibration of instrumentation.
+
+The curve follows the function:
+
+
+        15 * (sin(Q*R) - Q*R*cos(Q*R))^2
+I(Q) = ----------------------------------
+                 2 * pi * (Q*R)^6
+
+We could safely ignore the 15 / 2 pi normalisation factor when dealing with
+the log likelihoods but it's left in here.
+
+
+
+"""
+
 from . import curve as base
 
 import numpy as np

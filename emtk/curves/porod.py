@@ -1,3 +1,45 @@
+"""Porod scattering arises from flat surfaces, either planes or
+fairly regular particle surfaces.  This gives rise to a scattering of the type
+
+         A
+I(Q) = -----
+        Q^4
+
+This code here includes the possibility of fractal Porod behaviour,
+where the surface exhibits self-similarity over the probed length
+scales and this modifies the dimensionality so that the curve now
+follows
+
+         A
+I(Q) = -----
+        Q^z
+
+where non-integer values of z are related to the fractal
+dimensionality.
+
+Power laws usually don't actually exist in practice, only within an
+asymptotic region of parameter space.  The "true" curve is usually
+something like a log-normal or gamma distribution, but if you are in
+the power law regime you cannot know what that might be.  The second
+problem is that least squares fitting is notoriously bad at
+determining the parameters of a power law.  The third problem is that
+a power law diverges to infinity at Q=0.  The solution to all three of
+these problems is to use maximum likelihood estimation to determine
+qmin and z.  There is an iterative process of choosing a qmin,
+estimating z, and then updating our qmin estimate as appropriate.
+
+There are rigorous studies of this mathematical problem, a good one to
+read is Clauset, Shalizi and Newman in SIAM REVIEW 2009 (doi:
+10.1137/070710111 )
+
+The wheel is not reinvented here.  The code below uses the existing
+power law package, which is a python implementation very similar ot
+the R package of the same name.  These determine (iteratively) qmin
+and z.  Because it iterates over qmin and z it can be a bit slow, but
+it's the best way to estimate the parameters.
+
+"""
+
 
 from . import curve as base
 
@@ -102,9 +144,3 @@ class PorodCurve(base.Curve):
 
 
 
-
-# TO DO:
-
-#  P value tests
-#  Goodness of fit metrics - "Is the fit good, or valid?"
-#  Bayesian information criterion - "Which is the best model that fits my data"
