@@ -1,4 +1,4 @@
-"""omegaFunctions.py
+"""omega.py
 
 This is a standard set of statistical functions that one normally
 enounters in neutron scattering, such as background subtraction,
