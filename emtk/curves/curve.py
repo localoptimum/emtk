@@ -112,7 +112,7 @@ class Curve:
         self.hessian = np.empty(0)
         self.method = "only from guesses"
         self.forcenumeric = False
-        self.issorted = False
+        self.is_sorted = False
         self.kdeobject = None
 
     def kde(self, xvals):
@@ -517,7 +517,7 @@ class Curve:
         """
 
         self.data = np.sort(self.data)
-        self.issorted = True
+        self.is_sorted = True
 
     def ad_test(self):
         """Computes the Anderson Darling test statistic for the distribution
@@ -529,8 +529,8 @@ class Curve:
         """
 
         nn = float(len(self.data))
-        if not self.issorted:
-            self.sortData()
+        if not self.is_sorted:
+            self.sort_data()
 
         rev = np.flip(self.data)
 
@@ -561,8 +561,8 @@ class Curve:
         """
 
         nn = float(len(self.data))
-        if not self.issorted:
-            self.sortData()
+        if not self.is_sorted:
+            self.sort_data()
 
         cdfy = self.cdf(self.estimates, self.data)
         ecdfy = np.arange(1, nn+1) / nn

@@ -76,14 +76,14 @@ class LorentzianCurve(base.Curve):
         maxdata = np.amax(self.data)
         nguess = 50
         kappas = np.logspace(-4,-1, nguess)
-        guessVals = np.zeros_like(kappas)
+        guess_vals = np.zeros_like(kappas)
 
         for ii in range(nguess):
             pars = np.array([self.guesses[0], kappas[ii]])
-            guessVals[ii] = self.llcurve(pars)
+            guess_vals[ii] = self.llcurve(pars)
 
-        bestEstimate = np.argmax(guessVals)
-        self.guesses[0] = kappas[bestEstimate]
+        best_estimate = np.argmax(guess_vals)
+        self.guesses[0] = kappas[best_estimate]
 
     def mle(self):
         """Passes through to the base class to perform numerical MLE.
@@ -188,7 +188,12 @@ class LorentzianCurve(base.Curve):
         nn = float(len(dat))
         xs = np.arange(xmin, xmax, stp)
 
-        print ("siz", xs.size, xmin, xmax, stp, (xmax-xmin)/stp)
+        # With float rounding error, sometimes the length splills over
+        # to 101 pts.  If so, remove the last point
+        if xs.size > 100:
+            xs = np.delete(xs, -1)
+
+        #print ("siz", xs.size, xmin, xmax, stp, (xmax-xmin)/stp)
 
         ecdfy = np.zeros_like(xs)
 
@@ -205,8 +210,8 @@ class LorentzianCurve(base.Curve):
         # Overloading the base class ks-test and doing a numerical KS test with two eCDFs
         nn = float(len(self.data))
         nni = int(nn)
-        if self.issorted is False:
-            self.sortData()
+        if self.is_sorted is False:
+            self.sort_data()
 
         minx = np.amin(self.data)
         maxx = np.amax(self.data)
@@ -215,13 +220,13 @@ class LorentzianCurve(base.Curve):
         pmax = self.cdf(self.estimates, maxx)
 
         uniform = np.random.uniform(pmin, pmax, nni)
-        synth = self.Quantile(self.estimates, uniform)
+        synth = self.quantile(self.estimates, uniform)
 
         synth = np.sort(synth)
 
-        ecdfx, ecdfy = self.gridEcdf(self.data) # self.CDF(self.estimates, self.data)
+        ecdfx, ecdfy = self.grid_ecdf(self.data) # self.CDF(self.estimates, self.data)
         #ecdfy = np.arange(1, nn+1) / nn
-        scdfx, scdfy = self.gridEcdf(synth)
+        scdfx, scdfy = self.grid_ecdf(synth)
 
         dif = np.absolute(scdfy - ecdfy)
         ks = np.amax(dif)

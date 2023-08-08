@@ -54,7 +54,7 @@ class GaussianCurve(curve.Curve):
         self.nparams=2
 
         if len(data) > 0:
-            self.setupGuesses()
+            self.setup_guesses()
 
     def mleAnalytic(self):
         """Analytical MLE of gaussian distribution parameters.
@@ -74,7 +74,7 @@ class GaussianCurve(curve.Curve):
         """
 
         #self.mleAnalytic()
-        MLECurve.mle(self)
+        curveCurve.mle(self)
 
     def curve(self, params, dat=np.array(None)):
         """The likelihood curve of a gaussian distriubtion.
@@ -185,14 +185,14 @@ class GaussianCurve(curve.Curve):
         maxdata = np.amax(self.data)
         nguess = 100
         sigmas = np.random.uniform(low=mindata/1000.0, high=maxdata, size=nguess)
-        guessVals = np.zeros_like(sigmas)
+        guess_vals = np.zeros_like(sigmas)
 
         for ii in range(nguess):
             pars = np.array([self.guesses[0], sigmas[ii]])
-            guessVals[ii] = self.llcurve(pars)
+            guess_vals[ii] = self.llcurve(pars)
 
-        bestEstimate = np.argmax(guessVals)
-        self.guesses[1] = sigmas[bestEstimate]
+        best_estimate = np.argmax(guess_vals)
+        self.guesses[1] = sigmas[best_estimate]
 
     def cdf(self, params, x):
         """Analytical computation of the cumulative distribution function
@@ -255,7 +255,7 @@ class GaussianCurve(curve.Curve):
         print(self.guesses, "as initial guesses (mu, sigma)")
         print(self.estimates, "solution obtained", self.method)
 
-        if self.verifyMaximum():
+        if self.verify_maximum():
             derivStr = "a maximum"
         else:
             derivStr = "not a maximum"

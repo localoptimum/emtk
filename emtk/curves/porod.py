@@ -129,7 +129,7 @@ class PorodCurve(base.Curve):
         print(self.guesses, "as initial guesses (z, qmin)")
         print(self.estimates, "solution obtained", self.method)
 
-        #if self.verifyMaximum():
+        #if self.verify_maximum():
         #    derivStr = "a maximum"
         #else:
         #    derivStr = "not a maximum"
