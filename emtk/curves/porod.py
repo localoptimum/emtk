@@ -52,7 +52,7 @@ class PorodCurve(base.Curve):
         self.nparams=2
 
         if len(data) > 0:
-            self.setupGuesses()
+            self.setup_guesses()
 
     def mle(self):
         """Analytical MLE of gaussian distribution parameters, using 
@@ -115,7 +115,7 @@ class PorodCurve(base.Curve):
         return qtl
 
     
-    def setupGuesses(self):
+    def setup_guesses(self):
         self.guesses = np.array([4.0, 0.01])
 
     

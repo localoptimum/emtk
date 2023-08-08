@@ -63,7 +63,7 @@ class LorentzianCurve(base.Curve):
         if len(data) > 0:
             self.setupGuesses()
 
-    def setupGuesses(self):
+    def setup_guesses(self):
         """Creates initial guesses of the parameters before numerical MLE
         method is applied.
 
@@ -91,7 +91,7 @@ class LorentzianCurve(base.Curve):
         """
 
         base.Curve.mle(self)
-        self.calcVariances()
+        self.calc_variances()
 
     def curve(self, params, dat=np.array([None])):
         """Returns the basic likelihood curve for a Lorentzian function.
@@ -117,7 +117,7 @@ class LorentzianCurve(base.Curve):
         lg = np.log(lorf, out=np.full_like(lorf, 1.0E-30), where= lorf!=0 )
         return np.sum(lg)
 
-    def dllcurve(self, params=np.array([None])):
+    def d_llcurve(self, params=np.array([None])):
         """The analytical first derivative of the log-likelihood of a
         Lorentzian distribution.
 
@@ -132,7 +132,7 @@ class LorentzianCurve(base.Curve):
         grad = np.sum( (1.0/kappa) - 2.0 * kappa / (kappa**2.0 + data2))
         return np.array([grad])
 
-    def ddllcurve(self, params=np.array([None])):
+    def dd_llcurve(self, params=np.array([None])):
         """The analytical second derivative of the log-likelihood of a
         Lorentzian distribution.
 
@@ -159,23 +159,23 @@ class LorentzianCurve(base.Curve):
         cdf = (1.0/np.pi) * np.arctan( x / kappa ) + 0.5
         return cdf
 
-    def halfcdf(self, params, x):
+    def half_cdf(self, params, x):
         # This is the CDF for half curve assuming the centre is at x=0
         kappa = params[0]
         cdf = 0.5 + np.arctan( x / kappa ) / np.pi
         return cdf
 
 
-    def Quantile(self, params, p):
+    def quantile(self, params, p):
         kappa = params[0]
         qn = kappa * np.tan(np.pi * (p - 0.5))
         return qn
 
-    def nQuantile(self, params, p):
-        cdf = super().Quantile(params, p)
+    def n_quantile(self, params, p):
+        cdf = super().quantile(params, p)
         return cdf
 
-    def gridEcdf(self, dat):
+    def grid_ecdf(self, dat):
         # Calculates the empirical CDF on a grid of 100 points
         xmin = np.amin(dat)
         xmax = np.amax(dat)
@@ -201,7 +201,7 @@ class LorentzianCurve(base.Curve):
 
 
 
-    def kstest(self):
+    def ks_test(self):
         # Overloading the base class ks-test and doing a numerical KS test with two eCDFs
         nn = float(len(self.data))
         nni = int(nn)
@@ -241,11 +241,11 @@ class LorentzianCurve(base.Curve):
         print(self.estimates, errstr, "solution obtained", self.method)
 
         print(self.estimates, "solution obtained", self.method)
-        print("That a maximum was found is", self.verifyMaximum(), "via second derivative")
+        print("That a maximum was found is", self.verify_maximum(), "via second derivative")
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
 
 
-    def calcVariances(self, crit = 1.0):
+    def calc_variances(self, crit = 1.0):
         '''
         Calculates the variance of the kappa parameter.
         For a single parameter curve, as is the case for SANS, this is
@@ -266,7 +266,7 @@ class LorentzianCurve(base.Curve):
 
         TODO:
             There are not yet any checks as to whether mle() was able to find a 
-            sensible result.  This means that calcVariances() might be unstable 
+            sensible result.  This means that calc_variances() might be unstable 
             and some sanity checks are probably needed before deployment.
 
         Parameters:
@@ -283,8 +283,8 @@ class LorentzianCurve(base.Curve):
         
         #crit = 1.96 (95% or roughly 2 sigma, is also a common option)
         
-        secondDiff = self.ddllcurve(self.estimates)
-        fisherI = -secondDiff/self.data.size
+        second_diff = self.dd_llcurve(self.estimates)
+        fisherI = -second_diff/self.data.size
         
         variance = 1.0 / fisherI
         self.variances = np.array([variance])

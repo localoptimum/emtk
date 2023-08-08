@@ -118,7 +118,7 @@ class GaussianCurve(curve.Curve):
         lg = np.log(normf, out=np.full_like(normf, 1.0E-30), where= normf!=0)
         return np.sum(lg)
 
-    def dllcurveAnalytic(self, params=np.array([None, None])):
+    def d_llcurve_analytic(self, params=np.array([None, None])):
         """The analytical first derivative of the log-likelihood function.
         
         Args:
@@ -145,7 +145,7 @@ class GaussianCurve(curve.Curve):
 
         return np.array([d1, d2])
 
-    def ddllcurveAnalytic(self, params=np.array([None, None])):
+    def dd_llcurve_analytic(self, params=np.array([None, None])):
         """Analytical second derivative of the log likelihood function.
 
         Args:
@@ -173,7 +173,7 @@ class GaussianCurve(curve.Curve):
 
         return np.array([dd1, dd2])
 
-    def setupGuesses(self):
+    def setup_guesses(self):
         """Creates initial parameter guesses to begin the numerical solution.
 
         """
@@ -218,7 +218,7 @@ class GaussianCurve(curve.Curve):
         cdf = 0.5 * ( 1.0 + erf((x - mu)/(sigma*root2)) )
         return cdf
 
-    def Quantile(self, params, p):
+    def quantile(self, params, p):
         """Analytical computation of the quantile function (inverse CDF) 
         for a gaussian distribution.
         

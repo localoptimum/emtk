@@ -25,7 +25,7 @@ from scipy.special import sici
 
 
 
-def sinintegral(theta):
+def sin_integral(theta):
     si, ci = sici(theta)
     return si
 
@@ -72,12 +72,12 @@ class HardSpheres(base.Curve):
         cdft = (-3.0 - 5.0 * xr2 + 
             2.0 * np.pi * xr5 + (3.0 - xr2 + 2.0 * xr4) * np.cos(2.0 * xr) + 
             xr * (6.0 + xr2) *  np.sin(2.0 * xr) + 
-            4.0 * xr5 * sinintegral(2.0 * xr))
+            4.0 * xr5 * sin_integral(2.0 * xr))
         cdfb = (4.0 * np.pi * xr5)
         return cdft / cdfb
 
     
-    def setupGuesses(self):
+    def setup_guesses(self):
         self.guesses = np.array([90.0])
 
 
@@ -157,11 +157,11 @@ class HardSpheres(base.Curve):
         print(self.guesses, "as initial guess")
         print(self.estimates, "solution obtained", self.method)
 
-        if self.verifyMaximum():
-            derivStr = "a maximum"
+        if self.verify_maximum():
+            deriv_str = "a maximum"
         else:
-            derivStr = "not a maximum"
+            deriv_str = "not a maximum"
 
-        print("The second derivative indicates that this is", derivStr)
+        print("The second derivative indicates that this is", deriv_str)
         #print(self.uncertainty(), "uncertainty sigma (=root-variance)")
     

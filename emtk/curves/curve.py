@@ -83,22 +83,22 @@ class Curve:
     Methods: 
         mle : 
             performs maximum likelihood estimation
-        generatebackground : 
+        generate_background : 
             create a flat, random background on the data
         llcurve : 
             the log-likelihood function of the distribution/
-        dllcurve : 
+        d_llcurve : 
             the first derivative of the log-likelihood function with
             respect to each parameter
-        ddllcurve : 
+        dd_llcurve : 
             the second derivative of the log-likelihood function 
             with respect to each parameter
-        generateTestSamples : 
+        generate_test_samples : 
             creates synthetic data that follows the probability 
             distribution
-        Quantile : the quantile function of the distribution
-        CDF : the cumulative distribution function
-        sortData : sorts the data in numerical order.  This is needed 
+        quantile : the quantile function of the distribution
+        cdf : the cumulative distribution function
+        sort_data : sorts the data in numerical order.  This is needed 
                    in some statistical test metrics
 
     """
@@ -148,8 +148,8 @@ class Curve:
         self.method = "numerically"
 
         while run:
-            yzero = self.dllcurve(self.estimates) # the derivative (to solve)
-            yprime = self.ddllcurve(self.estimates) # the second differential used to find the roots
+            yzero = self.d_llcurve(self.estimates) # the derivative (to solve)
+            yprime = self.dd_llcurve(self.estimates) # the second differential used to find the roots
             newvals = self.estimates - yzero / yprime # simple Newton iteration
             fracchange = newvals - self.estimates #self.estimates
             self.estimates = newvals
@@ -185,7 +185,7 @@ class Curve:
         return result
 
 
-    def generatebackground(self, xrange, ratio=1.0):
+    def generate_background(self, xrange, ratio=1.0):
         """Adds a flat background to the data
         
         Args:
@@ -210,7 +210,7 @@ class Curve:
         self.data = np.append(self.data, bgdata)
 
 
-    def setupGuesses(self):
+    def setup_guesses(self):
         print("ERROR: base class setupGuesses called.")
         raise NotImplementedError()
 
@@ -234,7 +234,7 @@ class Curve:
         raise NotImplementedError()
         return 0.0
 
-    def dllcurve(self, pars=np.array([None, None])):
+    def d_llcurve(self, pars=np.array([None, None])):
         """The first differential of the log-likelihood curve with respect to
         each parameter.  We are trying to find the roots of this
         curve.  This base class function performs a numerical
@@ -287,10 +287,10 @@ class Curve:
         return dydp
 
 
-    def ddllcurve(self, pars=np.array([None, None])):
+    def dd_llcurve(self, pars=np.array([None, None])):
         """The second differential of the log-likelihood curve with respect to
         each parameter.  This is used to direct a newton iteration to
-        the root of dllcurve.  This base class function performs a
+        the root of d_llcurve.  This base class function performs a
         numerical derivative, you can (should) override it with an
         analytical expression if it exists.
 
@@ -325,9 +325,9 @@ class Curve:
             parray1[ii] = p1
             parray2[ii] = p2
 
-            yzero = self.dllcurve(pars)[ii]
-            yone = self.dllcurve(parray1)[ii]
-            ytwo = self.dllcurve(parray2)[ii]
+            yzero = self.d_llcurve(pars)[ii]
+            yone = self.d_llcurve(parray1)[ii]
+            ytwo = self.d_llcurve(parray2)[ii]
 
             dy1 = yone-yzero
             dy2 = yzero-ytwo
@@ -341,7 +341,7 @@ class Curve:
 
 
 
-    def generateTestSamples(self, params, xrng, nsamples, verbose=True):
+    def generate_test_samples(self, params, xrng, nsamples, verbose=True):
         """Uses a quantile function to generate Monte-Carlo samples from the
         distribution.  This synthetic data can be used for testing and
         also for statistical quality-of-fit tests such as those
@@ -374,7 +374,7 @@ class Curve:
         pmax = self.cdf(params, xmax)
 
         uniform = np.random.uniform(pmin, pmax, nsamples)
-        self.data = self.Quantile(params, uniform)
+        self.data = self.quantile(params, uniform)
 
         # Some functions (e.g. hard spheres) have unusual features
         # Remove nan and inf values from the array
@@ -397,7 +397,7 @@ class Curve:
         while npass < nsamples:
             nneeded = nsamples - npass
             uniform = np.random.uniform(pmin, pmax, nneeded)
-            extra = self.Quantile(params, uniform)
+            extra = self.quantile(params, uniform)
             extra = extra[~np.isnan(extra)]
             extra = extra[~np.isinf(extra)]
             mask = extra > xmax
@@ -411,14 +411,14 @@ class Curve:
             npass = np.size(self.data)
             
         
-        self.setupGuesses()
+        self.setup_guesses()
         if verbose:
             print("Generated", npass, "samples using parameters", params)
 
 
         
 
-    def Quantile(self, params, p):
+    def quantile(self, params, p):
         """Returns the quantile function.  This base class performs a
         numerical inverse of the cumulative distribution function
         (CDF).  If possible, it should be overridden with an
@@ -510,7 +510,7 @@ class Curve:
         raise NotImplementedError()
         return 0.0
 
-    def sortData(self):
+    def sort_data(self):
         """Performs a sort of the data, which is needed for some
         quality-of-fit test statistics.
 
@@ -519,7 +519,7 @@ class Curve:
         self.data = np.sort(self.data)
         self.issorted = True
 
-    def adtest(self):
+    def ad_test(self):
         """Computes the Anderson Darling test statistic for the distribution
         This is work in progress - the cutoff values need to be
         figured out specifically for each distribution and maybe this
@@ -548,7 +548,7 @@ class Curve:
         return AA2
 
 
-    def kstest(self):
+    def ks_test(self):
         """Computes the Kolmogorov-Smirnov test statistic for the curve.  This
         is here for completeness, but there are better ones to use for
         sure.  The CDF appropriate for the test statistic might be
@@ -577,7 +577,7 @@ class Curve:
         return ks
 
 
-    def verifyMaximum(self):
+    def verify_maximum(self):
         """Verifies that the second derivative of the log-likelihood is
         negative, implying that we are at a maximum point.
 
@@ -586,7 +586,7 @@ class Curve:
 
         """
 
-        grad2 = self.ddllcurve()
+        grad2 = self.dd_llcurve()
         #print(grad2)
         result = True
         if np.any(grad2 >= 0.0):
@@ -601,12 +601,12 @@ class Curve:
 
         # We have much of this information already, as part of the
         # maximum likelihood estimation process
-        #diag = self.ddllcurve() # these are the diagonal elements of the hessian matrix
+        #diag = self.dd_llcurve() # these are the diagonal elements of the hessian matrix
         #rt = np.sqrt(fisher2)
         #return 1.0/rt
 
 
-    def plotFit(self, logarithmic=True, nbins=50):
+    def plot_fit(self, logarithmic=True, nbins=50):
         """Uses matplotlib to plot a fit of the data
 
         A histogram is constructed of the data.  The integral of the
