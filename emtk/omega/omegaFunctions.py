@@ -58,7 +58,7 @@ def kernel_density(data, xvals, normalise=False):
 
 
 
-def kdeBackgroundSubtract(spectrum, background, ratio=None, verbose=False):
+def kde_background_subtract(spectrum, background, ratio=None, verbose=False):
     ''' Uses kernel density estimation to establish the intensity of
         an arbitrary measured background at each point in the data set.  Then
         probabilistically removes data points that are correlated with this
