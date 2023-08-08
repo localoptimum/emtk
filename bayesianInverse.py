@@ -1,7 +1,13 @@
+"""This is a classic *histogrammed* approach to the inverse problem.
+It is a test of Lucy-Richardson deconvolution under fairly controlled
+conditions.
+
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-class bayesianHisto:
+class BayesianHisto:
     def __init__(self):
         self.nparams=0
         self.estimates = np.array([None])
@@ -10,15 +16,15 @@ class bayesianHisto:
         self.datay = np.empty(0)
         self.sigmay = np.array([None])
 
-        self.forcedRlimits = np.array([None])
+        self.forced_r_limits = np.array([None])
 
         self.rvals = np.empty(0)
         self.pr = np.empty(0)
 
         self.psf = None
 
-    def setRlimits(self, lims):
-        self.forcedRlimits = lims
+    def set_r_limits(self, lims):
+        self.forced_r_limits = lims
 
     def x2(self, yvals, fity, sigma=np.array([None])):
         '''Basic calculation of reduced chi-squared'''
@@ -36,7 +42,7 @@ class bayesianHisto:
         x2 = x2 / fity.size
         return x2
 
-    def getfity(self, uj, pij):
+    def get_fit_y(self, uj, pij):
         fity = pij.dot(uj)
         return(fity)
 
@@ -56,7 +62,7 @@ class bayesianHisto:
             transtrans = np.transpose(trans)
             self.psf = transtrans
 
-    def errorBarCalculation(self, datay, pij, uj):
+    def error_bar_calculation(self, datay, pij, uj):
         # We just figure out how far the individual bin moves
         # in order to increase x2 by one.
         # First order estimate overestimates the error bars significantly.
@@ -67,7 +73,7 @@ class bayesianHisto:
         testujs= np.sum(testuj)
         testuj = testuj / testujs
         
-        fity = self.getfity(testuj, pij)
+        fity = self.get_fit_y(testuj, pij)
         sumf = np.sum(fity)
         sumd = np.sum(datay)
         fity = fity * sumd/sumf
@@ -93,7 +99,7 @@ class bayesianHisto:
             #testujs= np.sum(testuj)
             #testuj = testuj / testujs
         
-            fity = self.getfity(testuj, pij)
+            fity = self.get_fit_y(testuj, pij)
             sumf = np.sum(fity)
             sumd = np.sum(datay)
             fity = fity * sumd/sumf
@@ -113,7 +119,7 @@ class bayesianHisto:
 
 
     
-    def LR_deconv(self, niter =100, calcErrors=False):
+    def lr_deconv(self, niter =100, calc_errors=False):
 
         if self.psf is None :
             self.psf, self.rvals = self.calc_psf()
@@ -128,7 +134,7 @@ class bayesianHisto:
         #print("pij is", pij.shape)
         #print("uj is", uj.shape)
         uj = uj / uj.size
-        fity = self.getfity(uj, pij)
+        fity = self.get_fit_y(uj, pij)
         
         sumf = np.sum(fity)
         sumd = np.sum(self.datay)
@@ -162,7 +168,7 @@ class bayesianHisto:
             testujs= np.sum(testuj)
             testuj = testuj / testujs
             
-            fity = self.getfity(testuj, pij)
+            fity = self.get_fit_y(testuj, pij)
             sumf = np.sum(fity)
             sumd = np.sum(self.datay)
             fity = fity * sumd/sumf
@@ -182,14 +188,14 @@ class bayesianHisto:
             #print(uj[0])
         
         # Maybe now we need to calculate errors?
-        if calcErrors:
-            errors = self.errorBarCalculation(self.datay, pij, uj)    
+        if calc_errors:
+            errors = self.error_bar_calculation(self.datay, pij, uj)    
     
         
         ujs = np.sum(uj)
         uj = uj / ujs
     
-        if calcErrors:
+        if calc_errors:
             errors = errors / ujs
         
         if converged:
@@ -202,13 +208,13 @@ class bayesianHisto:
 
         print("x2=", chisq)
         
-        if calcErrors:
+        if calc_errors:
             return uj, errors
         else:
             return uj
 
 
-class bayesianLorentzian(bayesianHisto):
+class BayesianLorentzian(BayesianHisto):
 
     def lorentzian(self, qq, kappa):
         lr = (kappa / np.pi) / (np.power(qq, 2.0) + np.power(kappa, 2.0))
@@ -332,7 +338,7 @@ class bayesianLorentzian(bayesianHisto):
         return self.estimates
 
     
-    def plotfit(self):
+    def plot_fit(self):
         errors = np.sqrt(self.datay)
 
         fig, ax = plt.subplots()
@@ -370,10 +376,10 @@ class bayesianLorentzian(bayesianHisto):
 
 
 
-class bayesianSpheres(bayesianHisto):
+class BayesianSpheres(BayesianHisto):
 
 
-    def hardsphere(self, xx, rr):
+    def hard_sphere(self, xx, rr):
         xr = xx * rr
         xr6= xr ** 6.0
         hrd = rr * ( np.sin(xr) - xr * np.cos(xr))**2.0  /  xr6
@@ -383,14 +389,14 @@ class bayesianSpheres(bayesianHisto):
         #datax = data[:,0]
         #datay = data[:,1]
         # First figure out range of kappa values
-        if self.forcedRlimits[0] is None:
+        if self.forced_r_limits[0] is None:
             xrange = np.array( [ np.amin(self.datax), np.amax(self.datax) ])
             rrange = 1.0/xrange
             rrange = np.round(np.flip(rrange))
             rvals = np.arange(1.0, 2.0*rrange[1], 1.0)
 
         else:
-            rrange = self.forcedRlimits
+            rrange = self.forced_r_limits
             rvals = np.arange(rrange[0], rrange[1], rrange[2])
                     
         #print(xrange)
@@ -405,7 +411,7 @@ class bayesianSpheres(bayesianHisto):
     
         for i in range(nx):
             for j in range(nr):
-                pmatrix[i,j] = pmatrix[i,j] + self.hardsphere(self.datax[i], rvals[j])
+                pmatrix[i,j] = pmatrix[i,j] + self.hard_sphere(self.datax[i], rvals[j])
         return pmatrix, rvals
 
     
@@ -489,7 +495,7 @@ class bayesianSpheres(bayesianHisto):
 
 
     
-    def plotfit(self):
+    def plot_fit(self):
         fig = plt.plot(self.datax, self.datay, 'bs')
         plt.xscale('log')
         plt.yscale('log')
@@ -521,7 +527,7 @@ class bayesianSpheres(bayesianHisto):
 
         
 
-class bayesianGuinier(bayesianHisto):
+class BayesianGuinier(BayesianHisto):
 
     def guinier(self, qq, rr):
             return np.exp(-qq*qq*rr*rr / 3.0)
@@ -610,7 +616,7 @@ class bayesianGuinier(bayesianHisto):
 
 
     
-    def plotfit(self):
+    def plot_fit(self):
         x2 = self.datax ** 2.0
         logy = np.log(self.datay)
         fig,ax = plt.subplots()
