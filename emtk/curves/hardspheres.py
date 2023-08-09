@@ -39,8 +39,11 @@ class HardSpheres(base.Curve):
         if len(data) > 0:
             self.setupGuesses()
     
-    def curve(self, params, dat=np.array(None)):
+    def curve(self, params, dat=None):
         # Return the basic likelihood curve
+
+        dat = np.asarray(dat)
+        
         R = params[0]
 
         if np.any(dat == None):

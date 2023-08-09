@@ -234,7 +234,7 @@ class Curve:
         raise NotImplementedError()
         return 0.0
 
-    def d_llcurve(self, pars=np.array([None, None])):
+    def d_llcurve(self, pars=None):
         """The first differential of the log-likelihood curve with respect to
         each parameter.  We are trying to find the roots of this
         curve.  This base class function performs a numerical
@@ -250,6 +250,8 @@ class Curve:
             the partial derivatives in respective order
 
         """
+
+        pars = np.asarray(pars)
 
         if np.any(pars == None):
             pars = self.estimates
@@ -287,7 +289,7 @@ class Curve:
         return dydp
 
 
-    def dd_llcurve(self, pars=np.array([None, None])):
+    def dd_llcurve(self, pars=None):
         """The second differential of the log-likelihood curve with respect to
         each parameter.  This is used to direct a newton iteration to
         the root of d_llcurve.  This base class function performs a
@@ -303,6 +305,8 @@ class Curve:
             the second partial derivatives in respective order
 
         """
+
+        pars = np.asarray(pars)
 
         if np.any(pars == None):
             pars = self.estimates

@@ -76,7 +76,7 @@ class GaussianCurve(curve.Curve):
         #self.mleAnalytic()
         curveCurve.mle(self)
 
-    def curve(self, params, dat=np.array(None)):
+    def curve(self, params, dat=None):
         """The likelihood curve of a gaussian distriubtion.
 
         Args:
@@ -90,6 +90,8 @@ class GaussianCurve(curve.Curve):
 
         """
 
+        dat = np.asarray(dat)
+        
         mu = params[0]
         sigma = params[1]
         if np.any(dat == None):
@@ -118,7 +120,7 @@ class GaussianCurve(curve.Curve):
         lg = np.log(normf, out=np.full_like(normf, 1.0E-30), where= normf!=0)
         return np.sum(lg)
 
-    def d_llcurve_analytic(self, params=np.array([None, None])):
+    def d_llcurve_analytic(self, params=None):
         """The analytical first derivative of the log-likelihood function.
         
         Args:
@@ -133,6 +135,8 @@ class GaussianCurve(curve.Curve):
 
         """
 
+        params = np.asarray(params)
+
         if np.any(params == None):
             params = self.estimates
 
@@ -145,7 +149,7 @@ class GaussianCurve(curve.Curve):
 
         return np.array([d1, d2])
 
-    def dd_llcurve_analytic(self, params=np.array([None, None])):
+    def dd_llcurve_analytic(self, params=None):
         """Analytical second derivative of the log likelihood function.
 
         Args:
@@ -160,6 +164,8 @@ class GaussianCurve(curve.Curve):
 
         """
 
+        params = np.asarray(params)
+
         if np.any(params == None):
             params = self.estimates
 
@@ -173,6 +179,8 @@ class GaussianCurve(curve.Curve):
 
         return np.array([dd1, dd2])
 
+
+    
     def setup_guesses(self):
         """Creates initial parameter guesses to begin the numerical solution.
 
@@ -194,6 +202,8 @@ class GaussianCurve(curve.Curve):
         best_estimate = np.argmax(guess_vals)
         self.guesses[1] = sigmas[best_estimate]
 
+
+        
     def cdf(self, params, x):
         """Analytical computation of the cumulative distribution function
         (CDF) of a gaussian distribution.

@@ -93,10 +93,11 @@ class LorentzianCurve(base.Curve):
         base.Curve.mle(self)
         self.calc_variances()
 
-    def curve(self, params, dat=np.array([None])):
+    def curve(self, params, dat=None):
         """Returns the basic likelihood curve for a Lorentzian function.
 
         """
+        dat = np.asarray(dat)
 
         xx = dat
         
@@ -117,12 +118,14 @@ class LorentzianCurve(base.Curve):
         lg = np.log(lorf, out=np.full_like(lorf, 1.0E-30), where= lorf!=0 )
         return np.sum(lg)
 
-    def d_llcurve(self, params=np.array([None])):
+    def d_llcurve(self, params=None):
         """The analytical first derivative of the log-likelihood of a
         Lorentzian distribution.
 
         """
 
+        params = np.asarray(params)
+        
         if np.any(params == None):
             params = self.estimates
 
@@ -132,11 +135,13 @@ class LorentzianCurve(base.Curve):
         grad = np.sum( (1.0/kappa) - 2.0 * kappa / (kappa**2.0 + data2))
         return np.array([grad])
 
-    def dd_llcurve(self, params=np.array([None])):
+    def dd_llcurve(self, params=None):
         """The analytical second derivative of the log-likelihood of a
         Lorentzian distribution.
 
         """
+
+        params = np.asarray(params)
 
         if np.any(params == None):
             params = self.estimates

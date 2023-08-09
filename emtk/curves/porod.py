@@ -74,8 +74,11 @@ class PorodCurve(base.Curve):
         
         self.estimates = np.array([alpha, xmin])
     
-    def curve(self, params, dat=np.array(None)):
+    def curve(self, params, dat=None):
         # Return the basic likelihood curve
+
+        dat = np.asarray(dat)
+        
         alpha = params[0]
         qmin = params[1]
 
