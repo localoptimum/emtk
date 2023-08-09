@@ -200,12 +200,17 @@ def kde_background_subtract(spectrum, background, spectrum_weight=1.0, backgroun
 
 
     # The following is working when weight=1.0.  When the weights are
-    # not 1.0 the rejected fraction is OK if the signal is larger than
-    # the background, but if the background is larger than the signal
-    # then the number of rejected events is much too high.  The
-    # problem, I think, is that the likelihood ratio is correctly
-    # bounded to zero on one side but goes to infinity on the other
-    # side, which is why the calculation breaks down.
+    # not 1.0 the rejected fraction is OK if the weight of the signal
+    # is larger than that of the background, but if the background
+    # weight is larger than that of the signal then the number of
+    # rejected events is much too high.  The problem, I think, is that
+    # the likelihood ratio is correctly bounded to zero on one side
+    # but goes to infinity on the other side, which is why the
+    # calculation breaks down.
+
+    # Having said that, the behaviour of the method is absolutely
+    # correct when the weights are unity, whether the background is
+    # large or small.
     
     reject_mask = dice <= point_reject_likelihood * ratio
     keep_mask = np.invert(reject_mask)
