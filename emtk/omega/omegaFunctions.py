@@ -38,10 +38,13 @@ def kernel_density(data, xvals, normalise=False):
             is normalised so that its sum equals unity.
 
     '''
-        
+
+       
     kdeobject = gaussian_kde(data, bw_method='silverman')
 
     kdevals = kdeobject.evaluate(xvals)
+
+    kdevals = kdevals
         
     if normalise:
         datasum = data.size
@@ -58,7 +61,7 @@ def kernel_density(data, xvals, normalise=False):
 
 
 
-def kde_background_subtract(spectrum, background, ratio=None, verbose=False):
+def kde_background_subtract(spectrum, background, spectrum_weight=1.0, background_weight=1.0, ratio=None, verbose=False):
     ''' Uses kernel density estimation to establish the intensity of
         an arbitrary measured background at each point in the data set.  Then
         probabilistically removes data points that are correlated with this
@@ -70,10 +73,13 @@ def kde_background_subtract(spectrum, background, ratio=None, verbose=False):
             background :
                 numpy array of Q values of each neutron event in the background
                 measurement
-            ratio :
-                (float, optional) the signal to noise ratio to assume, e.g. the 
-                ratio of monitor counts in the spectra.  If none is given, then 
-                the total of the spectrum and background will be calculated.
+            spectrum_weight :
+                (optional, float or numpy array of floats) the statistical weight
+                of the spectrum (e.g. monitor counts, relative strength of signal)
+            background_weight :
+                (optional, float or numpy array of floats) the statistical weight
+                of the background (e.g. monitor counts, relative strength of 
+                background)
             verbose : 
                 (boolean, optional) whether or not to output diagnostic
                 information.
@@ -81,46 +87,144 @@ def kde_background_subtract(spectrum, background, ratio=None, verbose=False):
         Returns:
             Nothing.  The data set is overwritten.
         '''
+
+    # Ensure data can be manipulated as an arrays, whether
+    # float or array is passed
+    spectrum = np.asarray(spectrum)
+    background = np.asarray(background)
+    spectrum_weight = np.asarray(spectrum_weight)
+    background_weight = np.asarray(background_weight)
+
     
-    if ratio is None :
-        bgsize = background.size
-        dtsize = spectrum.size
-        norm = dtsize/(bgsize+dtsize)
-        ratio = bgsize/dtsize
+    # Check that the dimension of the supplied weights is either unity
+    # or equals the length of the data array
+    spectrum_weight_size = spectrum_weight.size
+    spectrum_size = spectrum.size
+    background_weight_size = background_weight.size
+    background_size = background.size
+
+    
+    if spectrum_weight_size != spectrum_size:
+        #print("Size unequal")
+        if spectrum_weight_size != 1:
+            print("Error: dimension of spectrum weight array (", \
+                  spectrum_weight_size, \
+                  ") does not equal that of spectrum (", spectrum_size, ")")
+            raise SystemExit("Unequal array size")
+    if background_weight_size != background_size:
+        #print("Size unequal")
+        if background_weight_size != 1:
+            print("Error: dimension of background weight array (", \
+                  background_weight_size, \
+                  ") does not equal that of data (", background_size, ")")
+            raise SystemExit("Unequal array size")
+
+
+
+    # If statistical weights are provided, then we should scale these
+    # so that the largest of them is unity
+
+    if spectrum_weight_size == background_weight_size == 1:
+        # single float values given for each weight
+        if spectrum_weight > background_weight:
+            background_weight = background_weight / spectrum_weight
+            spectrum_weight = np.asarray(1.0)
+        else:
+            spectrum_weight = spectrum_weight / background_weight
+            background_weight = np.asarray(1.0)
+
+    if verbose:
+        print("Spectrum weight:", spectrum_weight)
+        print("Background weight:", background_weight)
+            
+        
+    # The number of data points also needs to be taken into account,
+    # not just the statistical weights
+    if background_weight_size != 1:
+        background_strength = np.sum(background_weight)
     else:
-        norm = ratio
+        background_strength = background.size * background_weight
+
+    if spectrum_weight_size != 1:
+        spectrum_strength = np.sum(spectrum_weight)
+    else:
+        spectrum_strength = spectrum.size * spectrum_weight
+
+        #bgsize = background.size
+        #dtsize = spectrum.size
+        #norm = spectrum_strength/(background_strength + spectrum_strength)
+        ratio = background_strength/spectrum_strength
+    #else:
+    #    norm = ratio
 
     if verbose :
         print("Ratio:", ratio)
-        print("Norm:", norm)
-        print("1-norm:", 1.0-norm)
+        #print("Norm:", norm)
+        #print("1-norm:", 1.0-norm)
 
-    # Now for each data point, we identify the probability of rejecting it.
-    # Because of norm, we can just loop over all data points, estimate the
-    # intensity at the data point based on the KDE of the background spectrum
-    # and roll a random number to see if it survives.  If the random number is
-    # below norm * KDE then the event in question dies.
-    
-    dice = np.random.uniform(0.0, 1.0, dtsize)
-    
+    # Now for each data point, we identify the probability of
+    # rejecting it.  Because of norm, we can just loop over all data
+    # points, estimate the intensity at the data point based on the
+    # KDE of the background spectrum and roll a random number to see
+    # if it survives.  If the random number is below norm * KDE then
+    # the event in question dies.
+
+    # Random coin tosses matching size of data array
+    dice = np.random.uniform(0.0, 1.0, spectrum_size)
+
+    # Evaluate background intensity at data point locations
     kdebg = kernel_density(background, spectrum)
+    #kdebg = kdebg #* background_weight
 
+    # Perform identical evaluation of data points at data point
+    # locations The reason to do this is in case there are any
+    # artefacts associated with the kernel shape function.  In theory,
+    # this step could be skipped entirely but it's likely the kernel
+    # function is normalised, so then the relative intensity
+    # at the centre point is constant and below 1.0
     kdesp = kernel_density(spectrum, spectrum)
+    #kdesp = kdesp #* spectrum_weight
 
-    rejectProbability = kdebg / kdesp
+    # We probabilistically reject a point where the KDE of the
+    # signal is below the KDE of the background
+    point_reject_likelihood = kdebg / kdesp
+
+    # that fraction is the *likelihood* ratio, the probability is
+    #normalised, e.g.
+
+    #point_reject_prob = kdebg / (kdebg + kdesp)
+    #point_keep_prob = kdesp / (kdebg + kdesp)
+
+    # Why does the likelihood work better for background subtraction?
+    # Because in the tails the probability is too high
+
+
+    # The following is working when weight=1.0.  When the weights are
+    # not 1.0 the rejected fraction is OK if the signal is larger than
+    # the background, but if the background is larger than the signal
+    # then the number of rejected events is much too high.  The
+    # problem, I think, is that the likelihood ratio is correctly
+    # bounded to zero on one side but goes to infinity on the other
+    # side, which is why the calculation breaks down.
     
-    keepmask = dice <= rejectProbability*ratio
-    rejectmask = np.invert(keepmask)
+    reject_mask = dice <= point_reject_likelihood * ratio
+    keep_mask = np.invert(reject_mask)
 
-    subtracted = spectrum[rejectmask]
+    subtracted = spectrum[keep_mask]
+
+    subtracted_size = subtracted.size
 
     if verbose:
         print("dice", dice)
         print("x   ", spectrum)
         print("spec", kdesp)
         print("back", kdebg)
-        print("rej ", rejectProbability)
-        print("masj", rejectmask)
+        print("rej ", point_reject_likelihood)
+        print("masj", reject_mask)
+
+        print("# in ", spectrum_size)
+        print("# out", subtracted_size)
+        print("survive fraction", subtracted_size/spectrum_size)
     
     return subtracted
 
