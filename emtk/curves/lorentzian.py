@@ -160,6 +160,8 @@ class LorentzianCurve(base.Curve):
 
         """
 
+        params = np.asarray(params)
+
         kappa = params[0]
         cdf = (1.0/np.pi) * np.arctan( x / kappa ) + 0.5
         return cdf
