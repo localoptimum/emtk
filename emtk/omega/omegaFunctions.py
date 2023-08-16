@@ -12,11 +12,55 @@ uniquely.
 
 from scipy.stats import gaussian_kde
 
+from sklearn.neighbors import KernelDensity
+
 import numpy as np
 
 def kernel_density(data, xvals, normalise=False):
+    return kernel_density_sklearn(data, xvals, normalise=False)
 
+
+def kernel_density_sklearn(data, xvals, normalise=False, bandwidth="silverman", kernel='gaussian', rtol=1E-09):
+    '''Performs kernel density estimation (KDE) using sci-kit learn.  This
+was added 16-Aug-2023 when seeing that the scipy method was very slow.
+This website explains why skl is advantageous in many scenarios:
+https://jakevdp.github.io/blog/2013/12/01/kernel-density-estimation/
+
+Also, the sci-kit learn implementation returns the log-likelihood, so
+we have an extra step at the end to take the exponent.  The scipy API
+is the cleanest ;)
+
+    Arguments:
+        data :
+            numpy array (float) of events (x or Q values) for each neutron
+            event.
+        xvals :
+            numpy array (float) of points at which to sample the KDE.
+        normalise :
+            boolean (optional).  If true, then the output spectrum
+            is normalised so that its sum equals unity.
+        bandwidth :
+            float value of width to use, or either "scott" or "silverman" 
+            as a string.
+        kernel :
+            supply the name of the kernel function to use.  There are 
+            several - see the scikit-learn website for more details.
+        rtol :
+            float, the total relative error, essentially speed vs accuracy 
+            parameter.  Default is 1 part in 10^9.
+
+    '''
+
+    kde_skl = KernelDensity(bandwidth=bandwidth, kernel=kernel, rtol=rtol)
+    kde_skl.fit(data[:, np.newaxis])
+    log_pdf = kde_skl.score_samples(xvals[:, np.newaxis])
+    return np.exp(log_pdf)
     
+    
+
+
+def kernel_density_scipy(data, xvals, normalise=False):
+
     '''Performs kernel density estimation (KDE) using scipy.
 
     Kernel density estimation is a smoother way of sampling the
