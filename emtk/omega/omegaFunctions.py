@@ -164,6 +164,12 @@ def kde_background_subtract(spectrum, background, spectrum_weight=1.0, backgroun
             raise SystemExit("Unequal array size")
 
 
+    # Warn for computation on large array sizes
+    estd_time = 7.1E-08*spectrum.size*background.size
+
+    if estd_time > 10.0:
+        print("kde_background_subtract: estimated run time:", int(estd_time), "seconds", flush=True)
+ 
 
     # If statistical weights are provided, then we should scale these
     # so that the largest of them is unity
