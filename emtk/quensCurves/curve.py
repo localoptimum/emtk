@@ -364,6 +364,8 @@ class Curve:
 
         """
 
+        params = np.asarray(params)
+
         xmin = xrng[0]
         xmax = xrng[1]
 
