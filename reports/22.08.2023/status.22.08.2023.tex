@@ -1,0 +1,161 @@
+\documentclass{article}
+
+
+\author{P. M. Bentley}
+\title{Event Mode Data Analysis \\ Status Update}
+
+\begin{document}
+
+\maketitle
+
+\abstract{This report updates the status of the project so far.  A
+logical inconsistency is found with the current concept, meaning it
+can never function as intended.  It is therefore proposed to follow
+the other option as laid out by the project sponsor in a meeting in
+June 2023, which was rejected at the time since it seemed more
+complex.
+
+Finally, the outcomes so far are summarised, which should be useful in
+any case.}
+
+\section{The Project Goals}
+
+The current project's goals as currently understood are as follows.
+\begin{enumerate}
+  \item Develop techniques and tools to analyse data in event mode.
+    What this means is to essentially skip the data reduction step,
+    which traditionally reduces all detector events into smaller,
+    manageable histograms.  This is the main goal and is currently not
+    yet achieved.  Secondary goals are:
+  \item To understand better the flow and quantisation of information
+    during the measurement and fitting process.  This is now complete
+    --- the Fisher information is inversely related to the parameter
+    variance, and it is the Fisher information that we are obtaining.
+  \item To establish whether a single ESS pulse is sufficient to
+    obtain the information needed for some experiments.  This goal is
+    only partially achieved --- in early tests of some SANS curves, a
+    data size of 10$^4$ events and a signal to noise ratio of only
+    10$^{1}$ was easily sufficient to accurately determine the correct
+    line parameters.  It remains to be demonstrated in real data for
+    reasons that will be described in the next section.
+\end{enumerate}
+
+\section{The Current Concept}
+
+The current concept is based around streaming events, or bunches of
+events, into a live filter that continuously updates and refines
+parameters according to a given mathematical model.  There are two
+filters that have been developed and demonstrated:
+
+\begin{enumerate}
+
+\item Maximum Likelihood Estimation (MLE).  This is the most intuitive
+  given the problem at hand.  However, it requires a lot of work.  Specifically, given a probability density function (PDF) that would normally be used for least squares fitting, for example, the following additional functions are required to be evaluted either numerically (not ideal) or analytically (ideal):
+  \begin{itemize}
+  \item The cumulative distribution function (CDF)
+  \item The inverse of the CDF, the quantile function --- this, along
+    with the CDF to check the inverse property, is needed to generate
+    synthetic data and validate the routines before real data can be
+    used.
+  \item The log likelihood function (LLF), which is the logarithm of
+    the PDF (this is of course trivial)
+  \item The first differential of the LLF with respect to each parameter
+  \item The second differential of the LLF with respect to each parameter
+  \end{itemize}
+
+\item Bayesian Inference.  This is less intuitive to some scientists,
+  but it's much easier to code than MLE.  A grid of $n$ points is
+  created for each parameter, and the LLF is updated as a posterior
+  likelihood function for each event that is added to the accumulated
+  evidence.  No derivatives are needed, because we are not trying to
+  find the maximum likelihood, rather map it out.  The likelihood
+  curve is approximately gaussian because of the central limit
+  theorem, so the fit parameter can be taken as the mean of the
+  distribution and the standard deviation as the variance.  The
+  problem with bayesian inference is that the parameter space becomes
+  very large as the number of parameters $p$ increases, it scales as
+  $n^p$, so you need to use Markov Chain Monte Carlo (MCMC) to sample
+  the distribution space efficiently.
+\end{enumerate}
+
+There are existing packages that do bayesian inference with MCMC --- a
+good one is PyMC.  However, it relies on histogrammed data, defeating
+one of the objectives of this project.  MCMC has not yet been
+implemented in the current project, but it is not difficult to do.
+
+
+
+\section{A Logical Inconsistency}
+
+The following points illustrate why the current concept will not work.
+
+\begin{enumerate}
+
+\item \label{point:goal}Event mode analysis means analysing data sets before they are
+  evaluated for density, using histograms or kernel density estimation
+  (KDE).
+
+\item \label{point:density}In order to establish the correct line shape and parameters, we
+  need to correct for systematic errors.  This means subtracting
+  backgrounds from non-sample contributions, correcting for
+  transmission, wavelength distribution, detector efficiency, etc.
+  These are known as ``omega functions''.
+
+\item This will result in either:
+  \begin{itemize}
+    \item A weighted event, where the statistical weight of the event
+      is moderated by the \emph{relative density} of the effects in
+      point \ref{point:density}.  Work started on this but it is not fully complete.
+    \item Rejected / subsampled events through a filter, where the
+      likelihood of retaining an event is based on the \emph{relative
+      density} of the effects in point \ref{point:density}.  This
+      solution seems more intuitive and aligned with the spirit of the
+      project and there is already a KDE background subtraction tool.
+  \end{itemize}
+
+\item \label{point:needKDE}Calculating the relative density of data points means working
+  with either histograms or KDE.
+
+\item Point \ref{point:needKDE} contradicts point \ref{point:goal}.
+Therefore, our current concept is logically impossible.
+\end{enumerate}
+
+
+\section{What is the Solution?}
+
+The only logical step forwards is to put the omega functions into the
+model.  All of the systematic effects need to be modelled and included
+as a term in the PDF, before the log-likelihood is computed.  Whether
+or not this is possible will be studied in the coming weeks.
+
+
+
+\section{Outlook and Other Achievements}
+It might seem a bit disappointing, but this logical derivation is
+probably worth a conference paper and poster, or similar.
+I'm quite satisfied with it.
+
+I am also very happy with the following things:
+\begin{itemize}
+\item We know how to use these data analysis tools, which can be used
+  with histograms and might be part of the ESS toolkit in any case.
+\item We know what it is we are doing from an information theory point
+  of view.  I've wanted an answer to that question for about 15 years
+  and, whilst Fisher first formulated it in 1922, more than a century
+  ago, it's nice to have reached this point of understanding.  I'm
+  fairly sure that less than 1\% of the community fully appreciate it
+  even though it seems intuitive and even obvious once you reflect on
+  it.
+\item We have also a working implementation of Lucy-Richardson
+  deconvolution (LR), which in many ways is one step further
+  abstracted beyond bayesian inference.  I'm certain LR is useful for
+  ESS if it isn't already deployed in SANS and reflectometry
+  workflows, or indeed similar methods such as maximum entropy
+  deconvolution.
+\item The KDE sampling methods of background subtraction might also be
+  useful as a starting point to another toolkit if ESS wants to
+  develop a set of tools based around KDE as an improvement over the
+  old, trusty histogram.
+\end{itemize}
+
+\end{document}
