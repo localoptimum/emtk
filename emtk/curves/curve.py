@@ -7,7 +7,7 @@ to be binned into histograms.  Another advantage over least squares is
 that it tends to better fit the long tails of distributions and resist
 being overpowered by strong peaks.  This is because of the log-sum
 (instead of the linear difference squared) at the core of the
-routines.  For neutron scattering, typically fitting Lorentzian or
+routines.  For neutron scattering, typicall fitting Lorentzian or
 Voigtian lineshapes to curves on a log plot, this is ideal.  This can
 make MLE a *lot* more accurate in many scenarios that occur commonly
 in neutron scattering, muon spin relaxation etc.  It is also quite
@@ -138,10 +138,13 @@ class Curve:
 
         """
 
-        self.estimates = self.guesses
+        if np.any(self.estimates == None):
+            self.setup_guesses()
+            self.estimates = self.guesses
+
         run = True
         nsteps=0
-
+        
         #print("Numerical MLE")
         #print(self.estimates, "as starting estimates")
 
@@ -209,6 +212,9 @@ class Curve:
 
         self.data = np.append(self.data, bgdata)
 
+        # The data needs to be shuffled, otherwise it's correlated
+        np.random.shuffle(self.data)
+
 
     def setup_guesses(self):
         print("ERROR: base class setupGuesses called.")
@@ -252,11 +258,10 @@ class Curve:
         """
 
         pars = np.asarray(pars)
-
-        if np.any(pars == None):
-            pars = self.estimates
+                
         dydp = np.zeros_like(pars)
 
+        
         for ii in range(len(dydp)):
             p0 = pars[ii]
             if p0 == 0.0:
@@ -308,8 +313,8 @@ class Curve:
 
         pars = np.asarray(pars)
 
-        if np.any(pars == None):
-            pars = self.estimates
+
+        
         dydp = np.zeros_like(pars)
 
         for ii in range(len(dydp)):
@@ -363,6 +368,8 @@ class Curve:
                 optional boolean whether to describe activity
 
         """
+
+        params = np.asarray(params)
 
         xmin = xrng[0]
         xmax = xrng[1]
@@ -590,7 +597,7 @@ class Curve:
 
         """
 
-        grad2 = self.dd_llcurve()
+        grad2 = self.dd_llcurve(self.estimates)
         #print(grad2)
         result = True
         if np.any(grad2 >= 0.0):
