@@ -1,4 +1,4 @@
-from . import curve
+from . import curve as base
 
 #import emtk.omega as omega
 
@@ -30,7 +30,7 @@ from scipy.special import erfinv
 
 
 
-class GaussianCurve(curve.Curve):
+class GaussianCurve(base.Curve):
     """Implements an MLE analysis for a Gaussian (normal) curve.  This is
     provided as a thorough test case and validation of the underlying
     methodology of the toolkit.  It provides full examples of how to
@@ -68,13 +68,13 @@ class GaussianCurve(curve.Curve):
         sigma = np.sqrt(sigma2)
         self.estimates = np.array([mu, sigma])
 
-    def mle(self):
+    def mle(self, verbose=False):
         """Passes through to numerical MLE in the base class.
 
         """
 
         #self.mleAnalytic()
-        curveCurve.mle(self)
+        base.Curve.mle(self, verbose)
 
     def curve(self, params, dat=None):
         """The likelihood curve of a gaussian distriubtion.
@@ -120,6 +120,10 @@ class GaussianCurve(curve.Curve):
         lg = np.log(normf, out=np.full_like(normf, 1.0E-30), where= normf!=0)
         return np.sum(lg)
 
+    
+    # To activate the following function for testing it,
+    # rename it to d_llcurve() and it will be called by the
+    # base class instead of the numerical method
     def d_llcurve_analytic(self, params=None):
         """The analytical first derivative of the log-likelihood function.
         
@@ -149,6 +153,9 @@ class GaussianCurve(curve.Curve):
 
         return np.array([d1, d2])
 
+    # To activate the following function for testing it,
+    # rename it to dd_llcurve() and it will be called by the
+    # base class instead of the numerical method
     def dd_llcurve_analytic(self, params=None):
         """Analytical second derivative of the log likelihood function.
 
@@ -186,21 +193,26 @@ class GaussianCurve(curve.Curve):
 
         """
         # This is actually the analytic solution for mu:
-        self.guesses = np.array([np.mean(self.data), 0.0])
+        #self.guesses = np.array([np.mean(self.data), 0.0])
+
+        # Lets not do that, instead lets just take something in the middle
+        muguess = 0.5 * (np.amax(self.data) + np.amin(self.data))
+
+        self.guesses = np.array([muguess, 0.25 * muguess])
 
         # now generate a random sample over sigma and pick the best one as the initial estimate
-        mindata = np.amin(self.data)
-        maxdata = np.amax(self.data)
-        nguess = 100
-        sigmas = np.random.uniform(low=mindata/1000.0, high=maxdata, size=nguess)
-        guess_vals = np.zeros_like(sigmas)
+        #mindata = np.amin(self.data)
+        #maxdata = np.amax(self.data)
+        #nguess = 100
+        #sigmas = np.random.uniform(low=mindata/1000.0, high=maxdata, size=nguess)
+        #guess_vals = np.zeros_like(sigmas)
 
-        for ii in range(nguess):
-            pars = np.array([self.guesses[0], sigmas[ii]])
-            guess_vals[ii] = self.llcurve(pars)
+        #for ii in range(nguess):
+        #    pars = np.array([self.guesses[0], sigmas[ii]])
+        #    guess_vals[ii] = self.llcurve(pars)
 
-        best_estimate = np.argmax(guess_vals)
-        self.guesses[1] = sigmas[best_estimate]
+        #best_estimate = np.argmax(guess_vals)
+        #self.guesses[1] = sigmas[best_estimate]
 
 
         
