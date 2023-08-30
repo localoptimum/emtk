@@ -159,8 +159,13 @@ class Curve:
             nsteps = nsteps + 1
             if verbose:
                 print(self.estimates, yzero, yprime, fracchange)
-            if(nsteps > 50 or fracchange.all() < 1.0E-06):
+            if(nsteps > 50):
+                print("MLE halted after 50 iterations.")
                 run=False
+            if(fracchange.all() < 1.0E-06):
+                print("MLE converged for all parameters.")
+                run=False
+
 
     # Can use Scipy.optimize.minimize if you want
     # This requires a NEGATIVE log likelihood to minimise
