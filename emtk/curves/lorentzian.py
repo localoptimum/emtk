@@ -87,7 +87,7 @@ class LorentzianCurve(base.Curve):
         self.estimates = self.guesses
         print(self.estimates)
 
-    def mle(self):
+    def mle(self, verbose=False):
         """Passes through to the base class to perform numerical MLE.
 
         """
@@ -95,7 +95,7 @@ class LorentzianCurve(base.Curve):
         if (self.guesses == None).any():
             self.setup_guesses()
 
-        base.Curve.mle(self)
+        base.Curve.mle(self, verbose)
         self.calc_variances()
 
     def curve(self, params, dat=None):
@@ -426,12 +426,12 @@ class LorentzianBGCurve(base.Curve):
         self.guesses[0] = kappas[best_estimate]
         print(self.guesses)
 
-    def mle(self):
+    def mle(self, verbose=False):
         """Passes through to the base class to perform numerical MLE.
 
         """
 
-        base.Curve.mle(self)
+        base.Curve.mle(self, verbose)
         self.calc_variances()
 
     def curve(self, params, dat=None):
