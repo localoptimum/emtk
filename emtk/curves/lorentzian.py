@@ -409,22 +409,22 @@ class LorentzianBGCurve(base.Curve):
 
         print("Setting up guesses k and bg")
         
-        self.guesses = np.array([np.mean(self.data), 0.5])
+        self.guesses = np.array([np.mean(self.data), 0.1])
 
         # now generate a random sample over sigma and pick the best one as the initial estimate
-        mindata = np.amin(self.data)
-        maxdata = np.amax(self.data)
-        nguess = 50
-        kappas = np.logspace(-4,-1, nguess)
-        guess_vals = np.zeros_like(kappas)
+        #mindata = np.amin(self.data)
+        #maxdata = np.amax(self.data)
+        #nguess = 50
+        #kappas = np.logspace(-4,-1, nguess)
+        #guess_vals = np.zeros_like(kappas)
 
-        for ii in range(nguess):
-            pars = np.array([self.guesses[0], kappas[ii]])
-            guess_vals[ii] = self.llcurve(pars)
+        #for ii in range(nguess):
+        #    pars = np.array([self.guesses[0], kappas[ii]])
+        #    guess_vals[ii] = self.llcurve(pars)
 
-        best_estimate = np.argmax(guess_vals)
-        self.guesses[0] = kappas[best_estimate]
-        print(self.guesses)
+        #best_estimate = np.argmax(guess_vals)
+        #self.guesses[0] = kappas[best_estimate]
+        #print(self.guesses)
 
     def mle(self, verbose=False):
         """Passes through to the base class to perform numerical MLE.

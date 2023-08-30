@@ -144,25 +144,33 @@ class Curve:
 
         run = True
         nsteps=0
-        
-        #print("Numerical MLE")
-        #print(self.estimates, "as starting estimates")
+
+        if verbose:
+            print("Numerical MLE")
+            print(self.estimates, "as starting estimates")
+            print("Estimates    |      dy      |      ddy     |     frac-change")
 
         self.method = "numerically"
 
+        # We are now trying to use Newton-Raphson iteration to find the
+        # root of the first derivative.  The first derivative will cross
+        # zero when at a maximum or minimum.  In a log-likelihood curve,
+        # a maximum is expected rather than a minimum, so this method
+        # should be pretty robust.
+        
         while run:
-            yzero = self.d_llcurve(self.estimates) # the derivative (to solve)
-            yprime = self.dd_llcurve(self.estimates) # the second differential used to find the roots
-            newvals = self.estimates - yzero / yprime # simple Newton iteration
-            fracchange = newvals - self.estimates #self.estimates
+            dy = self.d_llcurve(self.estimates) # the derivative (to solve)
+            ddy = self.dd_llcurve(self.estimates) # the second differential used to find the roots
+            newvals = self.estimates - dy / ddy # simple Newton iteration
+            pchange = newvals - self.estimates #self.estimates
             self.estimates = newvals
             nsteps = nsteps + 1
             if verbose:
-                print(self.estimates, yzero, yprime, fracchange)
+                print(self.estimates, dy, ddy, pchange)
             if(nsteps > 50):
                 print("MLE halted after 50 iterations.")
                 run=False
-            if(fracchange.all() < 1.0E-06):
+            if(pchange.all() < 1.0E-06):
                 print("MLE converged for all parameters.")
                 run=False
 
