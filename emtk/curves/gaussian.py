@@ -2,6 +2,7 @@ from . import curve as base
 
 #import emtk.omega as omega
 
+import matplotlib.pyplot as plt
 
 import numpy as np
 
@@ -215,6 +216,93 @@ class GaussianCurve(base.Curve):
         #self.guesses[1] = sigmas[best_estimate]
 
 
+    def infer(self, mu_range=None, sigma_range=None, plot=True):
+
+        # Bayesian inference
+        mu_range = np.asarray(mu_range)
+        sigma_range = np.asarray(sigma_range)
+
+        # First, figure out range of mu values
+        if (mu_range == None).any():
+            dmax = np.amax(self.data)
+            dmin = np.amin(self.data)
+        else:
+            dmax = np.amax(mu_range)
+            dmin = np.amin(mu_range)
+        
+        span = dmax - dmin
+        mu_step = span/100.0
+        mus = np.arange(dmin, dmax, mu_step)
+
+
+        # And now sigma values
+        if (sigma_range == None).any():
+            sigma_min = span/20.0
+            sigma_max = span/2.0
+        else:
+            sigma_min = np.amin(sigma_range)
+            sigma_max = np.amax(sigma_range)
+            
+        sigma_step = (sigma_max - sigma_min)/100.0
+
+        sigmas = np.arange(sigma_min, sigma_max, sigma_step)        
+
+        # numpy meshspace creates two parallel array spaces
+        # whilst mathematica would interleave this and you'd have to
+        # index them separately.
+        # The first indexed value increases horizontally, the other
+        # increases vertically
+        mu, sigma = np.meshgrid(mus, sigmas)
+
+        
+        prior_value = 1.0E-04
+        
+        prior = np.full_like(mu, prior_value)
+        posterior = np.full_like(mu, prior_value)
+
+        # Flip into logspace
+
+        prior = np.log10(prior)
+        posterior = np.log10(posterior)
+
+
+        sigma_squared = sigma ** 2.0
+        norm = 1.0 / (sigma * np.sqrt(2.0 * np.pi))
+
+        # Infer
+        
+        for neutron in np.arange(0, self.data.size, 1):
+            posterior = prior + np.log10( \
+                norm * np.exp( -( ((self.data[neutron]-mu)**2.0) / (2.0 * sigma_squared))) \
+                                         )
+            prior = np.copy(posterior)
+
+        # Shift the log likelihood to sensible values around zero
+        maxp = np.amax(posterior)
+        posterior = posterior - maxp
+        
+        # Flip out of logspace and normalise
+        posterior = 10.0**posterior
+
+        #total = np.sum(posterior)
+        #posterior = posterior / total
+        
+        # 2D likelihood plot maybe
+        
+        if plot:
+            fig, ax = plt.subplots()
+            plt.contourf(mu, sigma, posterior)
+            plt.axis('scaled')
+            cbar = plt.colorbar()
+            cbar.set_label('Relative likelihood')
+            ax.set_xlabel('mu')
+            ax.set_ylabel('sigma')
+            plt.show
+
+
+
+            
+        
         
     def cdf(self, params, x):
         """Analytical computation of the cumulative distribution function
