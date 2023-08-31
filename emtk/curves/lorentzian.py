@@ -464,6 +464,104 @@ class LorentzianBGCurve(base.Curve):
 
 
 
+
+    def infer(self, r_range=None, bg_range=None, plot=True):
+
+        # Bayesian inference
+        r_range = np.asarray(r_range)
+        bg_range = np.asarray(bg_range)
+
+        # First, figure out range of kappa values
+        if (r_range == None).any():
+            xrange = np.array( [ np.amin(self.data), np.amax(self.data) ])
+        
+            logmean = np.mean(np.log10( xrange)) 
+            loghw = 0.5*np.std(np.log10(xrange))
+            rrange = np.array([10**(logmean-loghw), 10**(logmean+loghw)])
+            rrange = 1.0/rrange
+            rrange = np.round(rrange)
+        else:
+            rmax = np.amax(r_range)
+            rmin = np.amin(r_range)
+
+            rrange = np.array([rmin, rmax])
+            
+        print(rrange)
+
+        rmin = np.amin(rrange)
+        rmax = np.amax(rrange)
+
+        rstep = (rmax - rmin) / 100.0
+
+        rvals = np.arange(rmin, rmax, rstep)
+        revr = np.flip(rvals)
+        kappas = 1.0 / revr
+
+
+        if (bg_range == None).any():
+            bgmax = 2.0
+            bgmin = 0.1
+        else:
+            bgmax = np.amax(bg_range)
+            bgmin = np.amin(bg_range)
+
+        bgstep = (bgmax - bgmin) / 100
+        bgs = np.arange(bgmin, bgmax, bgstep)
+
+        
+        kappa, bg = np.meshgrid(kappas, bgs)
+
+        prior_value = 1.0E-04
+        
+        prior = np.full_like(kappa, prior_value)
+        posterior = np.full_like(kappa, prior_value)
+
+        # Flip into logspace
+
+        prior = np.log10(prior)
+        posterior = np.log10(posterior)
+
+
+        kappa2 = kappa**2.0
+
+
+        # Infer
+
+        for neutron in np.arange(0, self.data.size, 1):
+            posterior = prior + np.log10(bg + (kappa / np.pi) / (self.data[neutron]**2.0 + kappa2))
+            prior = np.copy(posterior) # this is copied over for the next iteration
+
+            
+        # Shift the log likelihood to sensible values around zero
+        maxp = np.amax(posterior)
+        posterior = posterior - maxp
+        
+        # Flip out of logspace and normalise
+        posterior = 10.0**posterior
+
+        #total = np.sum(posterior)
+        #posterior = posterior / total
+        
+        # 2D likelihood plot maybe
+        
+        if plot:
+            fig, ax = plt.subplots()
+            plt.contourf(kappa, bg, posterior)
+            plt.axis('scaled')
+            cbar = plt.colorbar()
+            cbar.set_label('Relative likelihood')
+            ax.set_xlabel('kappa')
+            ax.set_ylabel('bg')
+            ax.set_aspect('auto')
+            plt.show
+
+
+
+
+    
+
+
+
     def report(self):
         print("Lorentzian curve with background maximum likelihood estimation")
         print(len(self.data), "data points")
