@@ -12,6 +12,7 @@ It has the following objectives / requirements:
 5. Runs in python and jupyter notebooks
 6. Is interfaced with other ESS projects
 
+Note that this is an experimental project, it is not in any way some kind of production-ready tool for data analysis.
 
 ## Input Knowledge
 
