@@ -52,6 +52,8 @@ from . import curve as base
 
 import numpy as np
 
+from scipy.stats import gaussian_kde
+
 import matplotlib.pyplot as plt
 
 
@@ -302,20 +304,86 @@ class LorentzianCurve(base.Curve):
         
         
 
-    def infer(self, plot=False):
+    def infer(self, plot=False, background=None, verbose=True):
 
         # Bayesian inference
 
+        background = np.asarray(background)
+        if np.any(background == None):
+            # No background events were supplied
+            marginal_likelihood = np.full_like(self.data, 1.0)
+        else:
+            # Background events were supplied
+            print("Using background as marginal likelihood")
+            nbg = background.size
+            ndt = self.data.size
+            scale = ndt / nbg
+            # scikit-learn:
+            #kde = KernelDensity(bandwidth='silverman', kernel='gaussian')
+            #kde.fit(background[:, np.newaxis])
+            #marginal_likelihood = kde.score_samples(self.data[:, np.newaxis])
+
+            #scipy:
+            kde = gaussian_kde(background, bw_method='silverman')
+            marginal_likelihood = kde.evaluate(self.data)
+            
+            mlsum = np.sum(marginal_likelihood)
+            marginal_likelihood = scale * marginal_likelihood / mlsum
+
+            inverse_ml = 1.0 / marginal_likelihood
+
+            if verbose:
+                xmin = np.amin(background)
+                xmax = np.amax(background)
+
+                slic = (xmax-xmin)/51.0
+                hbins = np.arange(xmin, xmax, slic)
+
+                hst = np.histogram(background, bins=hbins)
+                xvals = np.delete(hbins,-1)
+                yvals=hst[0]
+                errors=np.sqrt(hst[0])
+
+                fig, ax = plt.subplots()
+                ax.errorbar(xvals, yvals, errors, fmt='o', mfc='none')
+                plt.yscale('log')
+                plt.xscale('log')
+                ax.set_xlabel('Q (Å-1)')
+                ax.set_ylabel('Intensity')
+                plt.xlim([xmin, xmax])
+                plt.show()
+                
+                
+                fig, ax = plt.subplots()
+                ax.scatter(self.data, marginal_likelihood)
+                ax.set_xlabel('Q')
+                ax.set_ylabel('Marginal likelihood')
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.xlim([xmin, xmax])
+                plt.show()
+                
+                fig, ax = plt.subplots()
+                ax.scatter(self.data, inverse_ml)
+                ax.set_xlabel('Q')
+                ax.set_ylabel('Inverse Marginal likelihood')
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.xlim([xmin, xmax])
+                plt.show()
+            
+            
+        
         # First figure out range of kappa values
         xrange = np.array( [ np.amin(self.data), np.amax(self.data) ])
         
         logmean = np.mean(np.log10( xrange)) 
-        loghw = 0.5*np.std(np.log10(xrange))
+        loghw =  np.std(np.log10(xrange))
         rrange = np.array([10**(logmean-loghw), 10**(logmean+loghw)])
         rrange = 1.0/rrange
         rrange = np.round(rrange)
 
-        #print(rrange)
+        print("rrange", rrange)
 
         rvals = np.arange(rrange[1], rrange[0], 1.0)
 
@@ -324,6 +392,8 @@ class LorentzianCurve(base.Curve):
         #print(rvals)
 
         kappas = 1.0 / revr
+        print("kappas", kappas[0], kappas[-1])
+        
 
         # Now setup prior
 
@@ -353,7 +423,8 @@ class LorentzianCurve(base.Curve):
         posterior = np.log10(posterior)
         
         for neutron in np.arange(0, self.data.size, 1):
-            posterior = prior + np.log10((kappas / np.pi) / (self.data[neutron]**2.0 + kappas2))
+            posterior = prior + np.log10((1.0/marginal_likelihood[neutron]) * \
+                                         (kappas / np.pi) / (self.data[neutron]**2.0 + kappas2))
             prior = np.copy(posterior) # this is copied over for the next iteration
 
         
