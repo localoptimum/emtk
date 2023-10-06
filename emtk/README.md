@@ -45,4 +45,4 @@ Then the following packages will be needed for the most recent tests.
 
 * pip3 install lmfit
 
-On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.
+On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.  You can [read more about it here](https://jax.readthedocs.io/en/latest/installation.html).
