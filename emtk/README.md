@@ -38,5 +38,11 @@ Then the following packages will be needed for the most recent tests.
 * conda install matplotlib
 * conda install pymc
 * conda install numpyro
+* conda install seaborn
+* conda install tqdm
+* conda install jupyterlab_widgets
+* conda install ipywidgets
 
-There are probably a few more needed from pip3, when I remember them I'll add them here.
+* pip3 install lmfit
+
+On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.
