@@ -25,4 +25,24 @@ Maximum entropy and bayesian methods are another interesting avenue to explore h
 ## Project Monitoring
 The project is managed by Thomas Rød from DMSC.  The [kanban board is here](https://jira.esss.lu.se/secure/RapidBoard.jspa?projectKey=EMTK&rapidView=1206).
 
+## Prerequisites
+The project environment can be recreated by installing the following.
+* Anaconda, which you can [get here](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html)
+* Optionally, create a conda environment with "conda create --name whatever"
+* conda install jupyterlab
 
+Then the following packages will be needed for the most recent tests.  
+* conda install scikit-learn
+* conda install powerlaw
+* conda install scipy
+* conda install matplotlib
+* conda install pymc
+* conda install numpyro
+* conda install seaborn
+* conda install tqdm
+* conda install jupyterlab_widgets
+* conda install ipywidgets
+
+* pip3 install lmfit
+
+On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.  You can [read more about it here](https://jax.readthedocs.io/en/latest/installation.html).
