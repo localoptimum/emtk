@@ -30,6 +30,7 @@ The project environment can be recreated by installing the following.
 * Anaconda, which you can [get here](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html)
 * Optionally, create a conda environment with "conda create --name whatever"
 * conda install jupyterlab
+
 Then the following packages will be needed for the most recent tests.  
 * conda install scikit-learn
 * conda install powerlaw
@@ -37,4 +38,5 @@ Then the following packages will be needed for the most recent tests.
 * conda install matplotlib
 * conda install pymc
 * conda install numpyro
+
 There are probably a few more needed from pip3, when I remember them I'll add them here.
