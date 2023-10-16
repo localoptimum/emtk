@@ -14,4 +14,12 @@ else
  module load anaconda/4.8.3
 fi
 ip=$(hostname -I|grep -o '172.18\S*')
-jupyter notebook --no-browser --port 1235 --ip $ip
+
+# Make sure we see all the conda env stuff, python modules etc
+source ~/.bashrc
+conda activate emtk
+
+conda env list # diagnostic
+
+#jupyter notebook --no-browser --port 1235 --ip $ip
+jupyter-lab --no-browser --port 1235 --ip $ip
