@@ -31,12 +31,13 @@ The project environment can be recreated by installing the following.
 * Optionally, create a conda environment with "conda create --name whatever"
 * conda install jupyterlab
 
-Then the following packages will be needed for the most recent tests.  
+Then the following packages have been used for the most recent tests, notebook files etc.
 * conda install scikit-learn
 * conda install powerlaw
 * conda install scipy
 * conda install matplotlib
 * conda install pymc
+* conda install pytorch
 * conda install numpyro
 * conda install seaborn
 * conda install tqdm
@@ -46,3 +47,11 @@ Then the following packages will be needed for the most recent tests.
 * pip3 install lmfit
 
 On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.  You can [read more about it here](https://jax.readthedocs.io/en/latest/installation.html).
+
+## Other Refs / Promising Avenues
+
+* [Edward](http://edwardlib.org): probabilistic programming library in python
+* [Tensorflow Probability](https://www.tensorflow.org/probability): self explanatory
+* [PyMC](https://www.pymc.io/welcome.html): PyMC, though note that the library it's based on is not maintained, which is a shame because it's got a rather clear API, so I hit dependency issues getting this to run.
+* [Pomegranate](https://pomegranate.readthedocs.io/en/latest/#) (and [its github](https://github.com/jmschrei/pomegranate)): Probabilistic programming based on pytorch.  This might be the quickest way through the project.
+
