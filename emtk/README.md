@@ -48,9 +48,14 @@ Then the following packages have been used for the most recent tests, notebook f
 
 On a mac, I was playing with JAX running on the apple M1 GPU (pip3 install jax-metal) but there are errors and version problems so that's work in progress.  You can also do JAX on CUDA, these speed up the MCMC sampling in PyMC but not the MAP.  You can [read more about it here](https://jax.readthedocs.io/en/latest/installation.html).
 
+## Most Recent Reading
+
+* 
+
 ## Packages
 
 * [PyMC](https://www.pymc.io/welcome.html): Currently **fails** due to dependency errors with numpy, possibly coming from legacy issues related to the discontinuation of theano, on which PyMC is based, which is a pity because it has a really clean API and all the scipy distributions.
+* [EMCEE](https://emcee.readthedocs.io/en/stable/) Brilliant.  Have to do everything by hand, it's just the sampler.  It's not quite working yet because I don't understand the marginal integration properly and there is a 90% chance I have coded that bit wrong.  It's therefore worth getting another more blackbox distro to do it right, so we can compare the outputs and fix the manual method.
 * [Pomegranate](https://pomegranate.readthedocs.io/en/latest/#) (and [its github](https://github.com/jmschrei/pomegranate)): **Best next option**.  Probabilistic programming based on pytorch.  It is the lightest API of all of them, but the distribution library is small.  Setting up a custom distribution has been removed from the documentation of the current version.  This might be the quickest way through the project if a custom distribution can be easily defined as per the old method, so it's what I'm going to do next.
 * [Tensorflow Probability](https://www.tensorflow.org/probability): self explanatory.  Second best option.  Relies on JAX also, but other backends are supported.  Also does the marginalisation but it's a bit obscure.
 * [Edward](http://edwardlib.org): probabilistic programming library in python.  It looks promising, in that it does the mixture weight marginalisation for you, but the API is a lot more involved than some of the others.  Looks like the scipy distributions are used.
