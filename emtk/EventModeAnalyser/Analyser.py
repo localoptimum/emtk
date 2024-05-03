@@ -175,3 +175,39 @@ class Analyser:
         
         self.lse_result = self.least_squares_model.fit(self.histy, self.least_squares_parameters, x=self.histx)
             
+    def get_lse_param_values(self):
+        # returns numpy array of best fit parameter values
+        valdict = self.lse_result.best_values
+        vals = np.zeros(len(valdict))
+
+        i = 0
+        for key in valdict:
+            vals[i] = valdict[key]
+            i=i+1
+        
+        return vals
+
+    def get_lse_param_names(self):
+        # returns array of parameter names
+        valdict = self.lse_result.best_values
+        vals = [None]*len(valdict)
+
+        i = 0
+        for key in valdict:
+            vals[i] = key
+            i=i+1
+        
+        return vals
+
+
+    def get_lse_param_sigmas(self):
+        # returns numpy array of best fit parameter sigmas
+        uvars = self.lse_result.result.uvars
+        sigmas =  np.zeros(len(uvars))
+
+        i = 0
+        for key in uvars:
+            sigmas[i] = uvars[key].std_dev
+            i=i+1
+        
+        return sigmas
