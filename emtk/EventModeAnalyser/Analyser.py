@@ -5,6 +5,7 @@ import emtk.EventModeAnalyser as ema
 
 import numpy as np
 import matplotlib.pyplot as plt
+from lmfit import Model
 
 
 class Analyser:
@@ -20,6 +21,7 @@ class Analyser:
         self.least_squares_pmf_function = None
         self.least_squares_parameters = None
         self.least_squares_model = None
+        self.lse_result = None
         self.histo = None
         self.kde = None
 
@@ -34,6 +36,32 @@ class Analyser:
             print("Analyser object created with", self.n_events, "weighted events in range", self.xmin, "-", self.xmax)
 
 
+    def simplex_weights(self, Qraw):
+        """
+        Computes the simplex of n+1 weighting factors given n mixture parameters
+
+        Raw Q values can run between 0-1 to keep things simple
+        The sum is assumed to be 1, preventing out of gamut values
+        That condition of unity summation must be enforced elsewhere, e.g. in the 
+        the log_prior.
+
+        Note that Qraw has one dimension fewer
+        than the number of parameters, like this:
+        https://en.m.wikipedia.org/wiki/Ternary_plot
+        """
+
+        Qraw = np.asarray(Qraw)
+    
+        Qsum = np.sum(Qraw)    
+        Qlast = 1.0 - Qsum
+        
+        Qvals = np.append(Qraw, Qlast)
+                
+        return Qvals
+
+
+
+    
             
     def optimal_n_bins(self):
         """Calculate optimal number of bins from Freedman-Diaconis rule
@@ -53,16 +81,10 @@ class Analyser:
             return 0
         return int((self.xmax - self.xmin)*self.n_events**(1.0/3.0)/(2.0*iqr))
 
-        
-            
-        
-    def plot_histogram(self):
-        """ Plots a histogram of the events in the scipp fashion
-        """
-
+    def calculate_histogram(self):
         if self.data is None:
             raise ValueError(
-                f"attempt to plot histogram with no data defined."
+                f"attempt to compute histogram with no data defined."
                 )
         
         # If we get here, we have events
@@ -79,17 +101,77 @@ class Analyser:
         else:
             hst = np.histogram(self.data, bins=hbins, weights=self.weights)
 
+        self.histo = hst
+
         x_hist = hst[1]
-        x_hist = x_hist[:-1] # eh?
+        x_hist = x_hist[:-1]
         y_hist = hst[0]
         e_hist = np.sqrt(y_hist)
 
+        self.histx = x_hist
+        self.histy = y_hist
+        self.histe = e_hist
+            
+        
+    def plot_histogram(self):
+        """ Plots a histogram of the events in the scipp fashion
+        """
+        if self.histo is None:
+            self.calculate_histogram()
+        
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
-        plt.step(x_hist, y_hist, where='post', label='Optimal Histo')
+        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
         plt.yscale('log')
         plt.xscale('log')
-        plt.ylabel('[numpy histo]')
+        plt.ylabel('Intensity')
+        plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
         plt.show()
 
+    def plot_LSE_fit(self):
+        if self.histo is None:
+            self.calculate_histogram()
+        
+        plt.rcParams["figure.figsize"] = (5.75,3.5)
+
+        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+
+        # That was the same as the above, now we evaluate the starting
+        # parameter PDF of the fit function
+        plt.plot(self.histx, self.lse_result.best_fit, color='black', label="LSE fit")
+        
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.ylabel('Intensity')
+        plt.xlabel('Q (Å$^{-1}$)')
+        plt.tight_layout()
+        plt.legend()
+        plt.show()
+        
+
+        
+    def set_lse_function(self, func):
+        self.least_squares_pmf_function = func
+        self.least_squares_model = Model(self.least_squares_pmf_function)
+        print("Least squares model function defined.")
+
+
+    def make_lse_params(self, **kwgs):
+        if self.least_squares_model is None:
+            raise ValueError(
+                f"attempt to create parameters for an undefined model.  Define the model function first."
+                )
+        self.least_squares_parameters = self.least_squares_model.make_params(**kwgs)
+
+    def lse_fit(self):
+        if self.histx.any() is None or self.histy.any() is None:
+            self.calculate_histogram()
+
+        if self.least_squares_model is None:
+            raise ValueError(
+                f"attempt to fit events with an undefined model.  Define the model function first."
+                )
+        
+        self.lse_result = self.least_squares_model.fit(self.histy, self.least_squares_parameters, x=self.histx)
+            
