@@ -3,6 +3,8 @@
 import emtk.EventModeAnalyser as ema
 """
 
+import copy
+
 import numpy as np
 import matplotlib.pyplot as plt
 from lmfit import Model
@@ -116,8 +118,7 @@ class Analyser:
     def plot_histogram(self):
         """ Plots a histogram of the events in the scipp fashion
         """
-        if self.histo is None:
-            self.calculate_histogram()
+        self.calculate_histogram()
         
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
@@ -130,15 +131,11 @@ class Analyser:
         plt.show()
 
     def plot_LSE_fit(self):
-        if self.histo is None:
-            self.calculate_histogram()
+        self.calculate_histogram()
         
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
         plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
-
-        # That was the same as the above, now we evaluate the starting
-        # parameter PDF of the fit function
         plt.plot(self.histx, self.lse_result.best_fit, color='black', label="LSE fit")
         
         plt.yscale('log')
@@ -211,3 +208,35 @@ class Analyser:
             i=i+1
         
         return sigmas
+
+    
+
+    def subsample(self, subsample_size):
+        # Randomly subsamples the events to a smaller data size.
+        # Returns a deep copy of the object.
+
+        copyobj = copy.deepcopy(self)
+
+        rng = np.random.default_rng()
+        elements = rng.choice(copyobj.n_events, subsample_size)
+
+        subsample = copyobj.data[elements]
+        subweights = copyobj.weights[elements]
+
+        copyobj.data = subsample
+        copyobj.weights = subweights
+        copyobj.n_events = subsample_size
+
+
+        
+        copyobj.xmin = np.amin(copyobj.data)
+        copyobj.xmax = np.amax(copyobj.data)
+
+        copyobj.lse_result = None
+        copyobj.histo = None
+        copyobj.kde = None
+
+        
+        
+        return(copyobj)
+        
