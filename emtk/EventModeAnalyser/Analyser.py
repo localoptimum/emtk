@@ -9,6 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lmfit import Model
 
+from sklearn.neighbors import KernelDensity
+from scipy.stats import gaussian_kde
 
 class Analyser:
     """Main object with which users will interact.
@@ -25,6 +27,10 @@ class Analyser:
         self.least_squares_model = None
         self.lse_result = None
         self.histo = None
+        self.histx = None
+        self.histy = None
+        self.histe = None
+        
         self.kde = None
 
         self.xmin = np.amin(self.data)
@@ -128,6 +134,7 @@ class Analyser:
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
+        plt.legend()
         plt.show()
 
     def plot_LSE_fit(self):
@@ -145,8 +152,57 @@ class Analyser:
         plt.tight_layout()
         plt.legend()
         plt.show()
-        
 
+
+
+
+
+    def calculate_kde(self):
+        print("Calculating KDE")
+        reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
+        # still compute optimal number of grid points
+        nx = self.optimal_n_bins()
+        slic=(self.xmax - self.xmin)/(nx+1)
+        
+        xgrid = np.arange(self.xmin, self.xmax, slic)
+
+        kde = gaussian_kde(self.data, bw_method="silverman", weights=self.weights)
+        xgrid_reshape = xgrid.reshape(-1, 1)
+        kde_line = kde.evaluate(xgrid)
+
+        end_delta = xgrid[-1] - xgrid[-2]
+        fakepoint = xgrid[-1] + end_delta
+        x_extra = np.append(xgrid, fakepoint)
+        xshift = np.delete(x_extra, 0)
+
+        dx = xshift - xgrid
+
+        slices = kde_line * dx
+
+        integral = np.sum(slices)
+
+        self.kdex = xgrid
+        self.kdey = kde_line * integral
+        self.kde = kde
+
+        
+    def plot_kde(self):
+
+        self.calculate_kde()
+        
+        plt.rcParams["figure.figsize"] = (5.75,3.5)
+
+        plt.plot(self.kdex, self.kdey, label='Optimal KDE')
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.ylabel('Intensity')
+        plt.xlabel('Q (Å$^{-1}$)')
+        plt.tight_layout()
+        plt.legend()
+        plt.show()
+        
+        
+        
         
     def set_lse_function(self, func):
         self.least_squares_pmf_function = func
