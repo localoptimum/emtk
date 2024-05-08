@@ -262,6 +262,8 @@ class Analyser:
             refLSE = False
         else:
             refLSE = True
+            pnams = self.get_lse_param_names()
+            pnams = pnams[1:]
         
         #truevals=np.array([true_kappa, np.log10(porod_events.size / (porod_events.size + curv.data.size))])
         for i in range(self.ndim):
@@ -269,9 +271,10 @@ class Analyser:
             ax.plot(samples[:, :, i], "k", alpha=0.3)
             if refLSE:
                 ax.hlines(lsp[i], 0, samples[:,:,i].size, color='r', ls='--', label='Least squares estimate')
-            #ax.hlines(truevals[i], 0, samples[:,:,i].size, color='g', ls='-', label='True value')
+                labeltxt = pnams[i]
+            else:
+                labeltxt = "$\\theta$[" + str(i) + "]"
             ax.set_xlim(0, len(samples))
-            labeltxt = "$\\theta$[" + str(i) + "]"
             ax.set_ylabel(labeltxt)
             ax.yaxis.set_label_coords(-0.1, 0.5)
 
