@@ -12,6 +12,8 @@ from lmfit import Model
 from sklearn.neighbors import KernelDensity
 from scipy.stats import gaussian_kde
 
+import emcee
+
 class Analyser:
     """Main object with which users will interact.
 
@@ -32,6 +34,13 @@ class Analyser:
         self.histe = None
         
         self.kde = None
+
+        self.theta_seed = None
+        self.nwalkers = 32 # just leave this alone probably
+        self.ndims = None
+        self.lpf = None
+        self.pmf = None
+        self.llf = None
 
         self.xmin = np.amin(self.data)
         self.xmax = np.amax(self.data)
@@ -292,7 +301,50 @@ class Analyser:
         copyobj.histo = None
         copyobj.kde = None
 
-        
-        
         return(copyobj)
+        
+
+    def MCMC_fit(self):
+        p0 = np.asarray(self.theta_seed)
+        self.ndim = p0.size
+        
+        if p0.any() is None:
+            raise ValueError(
+                f"attempt to launch MCMC with undefined initial theta_seed parameter values.  Define that first."
+                )
+
+        if self.lpf is None:
+            raise ValueError(
+                f"attempt to launch MCMC with undefined log prior function (llf).  Define that first."
+                )
+
+        if self.llf is None:
+            raise ValueError(
+                f"attempt to launch MCMC with undefined log likelihood function (llf).  Define that first."
+                )
+
+        print("MCMC launch")
+
+
+
+        p0 = [p0 + 1e-5 * np.random.randn(self.ndim) for k in range(self.nwalkers)]
+
+        myllf = self.llf
+        nwk = self.nwalkers
+        ndm = self.ndim
+
+        if self.weights.any() is None:
+            self.weights = np.ones_like(self.data)
+        
+        # Set up the sampler.
+        self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
+        
+        # Run a burn-in chain and save the final location
+        print("Burn in:")
+        state = self.sampler.run_mcmc(p0, 50, progress=True)
+    
+        # Run the production chain.
+        self.sampler.reset()
+        print("Sampling:")
+        self.sampler.run_mcmc(state, 200, progress=True);
         
