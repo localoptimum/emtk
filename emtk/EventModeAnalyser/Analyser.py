@@ -242,6 +242,44 @@ class Analyser:
         plt.tight_layout()
         plt.legend()
         plt.show()
+
+
+
+
+    def plot_MCMC_convergences(self):
+        # Plot the theta curves during sampling
+        if self.ndim is None or self.ndim < 1:
+            raise ValueError(
+                f"ndims is not defined so cannot subplot parameters."
+                )
+            
+        fig, axes = plt.subplots(self.ndim, figsize=(8, 10), sharex=True)
+        samples = self.sampler.get_chain(discard=100)
+
+        lsp = np.asarray(self.least_squares_parameters)
+
+        if lsp.any() is None or lsp.size < 1:
+            refLSE = False
+        else:
+            refLSE = True
+        
+        #truevals=np.array([true_kappa, np.log10(porod_events.size / (porod_events.size + curv.data.size))])
+        for i in range(self.ndim):
+            ax = axes[i]
+            ax.plot(samples[:, :, i], "k", alpha=0.3)
+            if refLSE:
+                ax.hlines(lsp[i], 0, samples[:,:,i].size, color='r', ls='--', label='Least squares estimate')
+            #ax.hlines(truevals[i], 0, samples[:,:,i].size, color='g', ls='-', label='True value')
+            ax.set_xlim(0, len(samples))
+            labeltxt = "$\\theta$[" + str(i) + "]"
+            ax.set_ylabel(labeltxt)
+            ax.yaxis.set_label_coords(-0.1, 0.5)
+
+        ax.legend()
+        plt.show()
+
+
+
         
         
     def set_lse_function(self, func):
