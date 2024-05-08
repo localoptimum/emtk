@@ -42,6 +42,9 @@ class Analyser:
         self.pmf = None
         self.llf = None
 
+        self.mcmc_parameter_values = None
+        self.mcmc_parameter_sigmas = None
+
         self.xmin = np.amin(self.data)
         self.xmax = np.amax(self.data)
 
@@ -419,5 +422,19 @@ class Analyser:
         self.sampler.reset()
         print("Sampling:")
         self.sampler.run_mcmc(state, 200, progress=True);
+
+
+    def get_MCMC_parameters(self):
+        samples=self.sampler.get_chain(flat=True)
+
+        self.mcmc_parameter_values = np.zeros(self.ndim)
+        self.mcmc_parameter_sigmas = np.zeros(self.ndim)
+
+        rge = range(self.ndim)
         
+        for i in rge:
+            self.mcmc_parameter_values[i] = np.mean(samples[:,i])
+            self.mcmc_parameter_sigmas[i] = np.std(samples[:,i])
+
+        return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
         
