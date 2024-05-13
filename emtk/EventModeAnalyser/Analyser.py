@@ -214,7 +214,43 @@ class Analyser:
         plt.show()
         
 
-    def plot_MCMC_fit(self):
+    def plot_MCMC_fit_with_histo(self):
+
+        flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
+
+        inds = np.random.randint(len(flat_samples), size=30)
+
+        plt.rcParams["figure.figsize"] = (5.75,3.5)
+        fig, ax = plt.subplots()
+
+        self.calculate_histogram()
+        pt_sum = np.sum(self.histy)
+
+        
+        for ind in inds:
+            sample = flat_samples[ind]
+            yfit = self.pmf(sample, self.histx, self.xmin, self.xmax, None)
+            ysum = np.sum(yfit)
+            scale = pt_sum / ysum
+            yfit = yfit * scale
+
+            if ind == inds[0]:
+                ax.plot(self.histx, yfit, color='black', alpha=0.2, label='Population of MCMC walkers')
+            else:
+                ax.plot(self.histx, yfit, color='black', alpha=0.2)
+        
+        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.ylabel('Intensity')
+        plt.xlabel('Q (Å$^{-1}$)')
+        plt.tight_layout()
+        plt.legend()
+        plt.show()
+
+
+        
+    def plot_MCMC_fit_with_kde(self):
 
         flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
 
@@ -247,7 +283,13 @@ class Analyser:
         plt.show()
 
 
+    def plot_MCMC_fit(self, method="kde"):
+        if method=="kde":
+            self.plot_MCMC_fit_with_kde()
+        if method=="histo":
+            self.plot_MCMC_fit_with_histo()
 
+            
 
     def plot_MCMC_convergences(self):
         # Plot the theta curves during sampling
