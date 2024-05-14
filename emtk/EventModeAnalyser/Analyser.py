@@ -381,13 +381,20 @@ class Analyser:
 
     def get_lse_param_sigmas(self):
         # returns numpy array of best fit parameter sigmas
-        uvars = self.lse_result.result.uvars
-        sigmas =  np.zeros(len(uvars))
+        if  self.lse_result.result.uvars != None:
+            uvars = self.lse_result.result.uvars
+            sigmas =  np.zeros(len(uvars))
+            
+            i = 0
+            for key in uvars:
+                sigmas[i] = uvars[key].std_dev
+                i=i+1
 
-        i = 0
-        for key in uvars:
-            sigmas[i] = uvars[key].std_dev
-            i=i+1
+        else:
+            if self.lse_result.best_values != None:
+                sigmas = np.zeros(len(self.lse_result.best_values))
+            else:
+                sigmas = np.asarray(0.0)
         
         return sigmas
 
@@ -421,7 +428,7 @@ class Analyser:
         return(copyobj)
         
 
-    def MCMC_fit(self):
+    def MCMC_fit(self, nburn=50, niter=200):
         p0 = np.asarray(self.theta_seed)
         self.ndim = p0.size
         
@@ -458,12 +465,12 @@ class Analyser:
         
         # Run a burn-in chain and save the final location
         print("Burn in:")
-        state = self.sampler.run_mcmc(p0, 50, progress=True)
+        state = self.sampler.run_mcmc(p0, nburn, progress=True)
     
         # Run the production chain.
         self.sampler.reset()
         print("Sampling:")
-        self.sampler.run_mcmc(state, 200, progress=True);
+        self.sampler.run_mcmc(state, niter, progress=True);
 
 
     def get_MCMC_parameters(self):
@@ -480,3 +487,70 @@ class Analyser:
 
         return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
         
+
+    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False):
+
+        samps = self.sampler.get_chain(flat=True)
+
+        npars = samps.shape[1]
+
+        if item < 0 or item >= npars:
+            raise ValueError(
+                f"attempt to analyse a parameter with an index that is out of the range of the number of available parameters."
+                )
+        
+        p_mean = np.mean(samps[:,item])
+        p_stddev = np.std(samps[:,item])
+
+        barmin = p_mean - p_stddev
+        barmax = p_mean + p_stddev
+
+
+        lsp = np.asarray(self.least_squares_parameters)
+        lsee = self.get_lse_param_sigmas()
+
+        if lsp.any() is None or lsp.size < 1 or compare==False:
+            refLSE = False
+            pnam= "parameter [" + str(item) + "]"
+            xlab = pnam
+            ylab = "p(" + xlab + ")"
+        else:
+            refLSE = True
+            pnams = self.get_lse_param_names()
+            pnams = pnams[1:]
+            pnam = pnams[item]
+            lse_pval = lsp[item]
+            lse_eval = lsee[item]
+            lstxt   = "LSE value " + str(round(lse_pval,4))
+            xlab = pnam
+            ylab = "p(" + xlab + ")"
+
+        fittxt = "MCMC value " + str(round(p_mean,4))
+
+        hst=plt.hist(samps[:,item], bins='auto', color='k', histtype="step")
+        ytop = np.amax(hst[0])
+        plt.xlabel(xlab)
+        plt.ylabel(ylab)
+        #plt.vlines(true_kappa, 0, ytop*0.8, color='g')            
+        plt.vlines(p_mean, 0, ytop, color="red")
+        plt.hlines(y=ytop*0.5, xmin=barmin, xmax=barmax, color="red")
+        #plt.xlim([true_kappa*0.7, true_kappa*1.3])
+        #plt.text(true_kappa*1.005, ytop*0.77, truetxt, color="g")
+        
+        plt.text(p_mean, ytop*0.97, fittxt, color="red")
+
+        if refLSE:
+            plt.vlines(lse_pval, 0, ytop*0.9, ls='--', color='b')
+            plt.hlines(y=ytop*0.9*0.5, xmin=lse_pval-lse_eval, xmax=lse_pval+lse_eval, ls='--', color='b')
+            plt.text(lse_pval*1.005, ytop*0.87, lstxt, color="b")
+
+        if log or loglog:
+            plt.xscale('log')
+
+        if loglog:
+            plt.yscale('log')
+
+            
+        plt.show()
+
+
