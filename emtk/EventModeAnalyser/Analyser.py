@@ -56,6 +56,110 @@ class Analyser:
             print("Analyser object created with", self.n_events, "weighted events in range", self.xmin, "-", self.xmax)
 
 
+    def help(self):
+        helpstr =\
+            """The analyser object is created with a numpy array of events
+(x-values) and their weights:\n
+
+            import emtk.EventModeAnalyser.Analyser as ema
+            ema1 = ema.Analyser(events, weights)
+
+There are two provided workflows with the same API.  The first API
+does regular histogram and least squares fit analysis with lmfit as a
+backend.  So you need to define a function and parameters, exactly
+according to lmfit documentation, which are passed through to lmfit.
+These include:
+
+            set_lse_function()
+            make_lse_params()
+            lse_fit()
+
+And to get the results of those fits:
+            plot_LSE_fit()
+            get_lse_param_values()
+            get_lse_param_sigmas()
+            get_lse_param_names()
+
+The last one takes the names as specified in the lmfit interface to
+make the parameters, as passed to the function above.
+
+The main event mode analysis part is a Markov-Chain Monte-Carlo
+sampling method using emcee as a backend.  If you want to subsample
+randomly the events to reduce the data size (e.g. for testing) you can
+do so - in this example we subsample a data size of 6 million events
+to only 50,000 for testing:
+
+            ema2 = ema1.subsample(50000)
+
+You can then visualise the data using either a histogram or a kernel
+density plot: 
+
+            ema2.plot_histogram() ema2.plot_kde()
+
+If necessary you can specify the y-axis limits for your KDE plot:
+
+            ema2.plot_kde([0.1, 20])
+
+Note that with event mode analysis, the background needs to be
+parameterised and fit as a contribution to the curve.  It is not
+subtracted.  However, all the other corrections (detector efficiency,
+solid angle etc) are quantified using the event weight array.
+
+You need to specify a log-prior function that takes one 'theta'
+argument as an array of variables; a pmf function that again takes
+'theta' and also an array of x-values as events, along with xmin,
+xmax, and an array of weights; and a log-likelihood function that
+again takes 'theta' and an array of x-values (events), xmin, xmax,
+weights, and the log-prior function as arguments.  This is a bit
+long-winded so look at the worked example notebook to see how to do
+it.  The API is then assigned these functions to use:
+
+            ema2.lpf = log_prior_function
+            ema2.pmf = probability_mass_function
+            ema2.llf = log_likelihood_function
+
+You then need to seed the search space with a starting point:
+
+            ema2.theta_seed = np.array([theta1, theta2, ... , thetaN])
+
+At this point you could do both fitting methods:
+           
+            ema2.lse_fit()
+            ema2.MCMC_fit()
+
+And to compare the fitting methods.  The MCMC fit can be shown using
+either a histogram or KDE plot for the events:
+       
+            ema2.plot_LSE_fit()
+            ema2.plot_MCMC_fit()
+            ema2.plot_MCMC_fit(method="histo")
+            ema2.plot_MCMC_fit(method="kde")
+
+
+To see the sampled distribution of the nth parameter, you can plot it
+with:
+
+            ema2.plot_MCMC_parameter_distribution(N)
+
+To compare with LSE parameter values (if they exist):
+
+            ema2.plot_MCMC_parameter_distribution(N, compare=True)
+
+To see a convergence trace of all parameters:
+            
+            ema2.plot_MCMC_convergences()
+
+Get the parameters and sigmas as determined by MCMC:
+
+            pvals, sigs = ema2.get_MCMC_parameters()
+            
+         
+
+"""
+
+        print(helpstr)
+            
+
     def simplex_weights(self, Qraw):
         """
         Computes the simplex of n+1 weighting factors given n mixture parameters
