@@ -117,9 +117,9 @@ class Analyser:
         hbins = np.arange(self.xmin, self.xmax, slic)
 
         if self.weights is None:
-            hst = np.histogram(study_data, bins=hbins)
+            hst = np.histogram(study_data, bins=hbins, density=True)
         else:
-            hst = np.histogram(self.data, bins=hbins, weights=self.weights)
+            hst = np.histogram(self.data, bins=hbins, density=True, weights=self.weights)
 
         self.histo = hst
 
@@ -178,7 +178,7 @@ class Analyser:
         
         xgrid = np.arange(self.xmin, self.xmax, slic)
 
-        kde = gaussian_kde(self.data, bw_method="silverman", weights=self.weights)
+        kde = gaussian_kde(self.data, bw_method=20*slic, weights=self.weights)
         xgrid_reshape = xgrid.reshape(-1, 1)
         kde_line = kde.evaluate(xgrid)
 
@@ -194,13 +194,18 @@ class Analyser:
         integral = np.sum(slices)
 
         self.kdex = xgrid
-        self.kdey = kde_line * integral
+        self.kdey = kde_line / integral
         self.kde = kde
 
         
-    def plot_kde(self):
+    def plot_kde(self, yspan=[None, None]):
+
+
+        yr = np.asarray(yspan)
 
         self.calculate_kde()
+
+        fig,ax = plt.subplots()
         
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
@@ -210,6 +215,9 @@ class Analyser:
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
+
+        if not yr.any() is None:
+            ax.set_ylim(yr)
         plt.legend()
         plt.show()
         
