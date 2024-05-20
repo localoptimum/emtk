@@ -14,6 +14,8 @@ from scipy.stats import gaussian_kde
 
 import emcee
 
+from typing import Tuple
+
 class Analyser:
     """Main object with which users will interact.
 
@@ -56,6 +58,8 @@ class Analyser:
             print("Analyser object created with", self.n_events, "weighted events in range", self.xmin, "-", self.xmax)
 
 
+
+            
     def help(self):
         helpstr =\
             """The analyser object is created with a numpy array of events
@@ -160,14 +164,14 @@ Get the parameters and sigmas as determined by MCMC:
         print(helpstr)
             
 
-    def simplex_weights(self, Qraw):
+    def simplex_weights(self, Qraw: np.ndarray) -> np.ndarray:
         """
-        Computes the simplex of n+1 weighting factors given n mixture parameters
+        Computes the simplex of n+1 weighting factors given n mixture parameters.
 
-        Raw Q values can run between 0-1 to keep things simple
-        The sum is assumed to be 1, preventing out of gamut values
-        That condition of unity summation must be enforced elsewhere, e.g. in the 
-        the log_prior.
+        Raw Q values can run between 0-1 to keep things simple.
+        The sum is assumed to be 1, preventing out of gamut values.
+        Whilst it would be possible to normalise the input array and return array,
+        this is most conveniently enforced with the log_prior function.
 
         Note that Qraw has one dimension fewer
         than the number of parameters, like this:
@@ -187,8 +191,9 @@ Get the parameters and sigmas as determined by MCMC:
 
     
             
-    def optimal_n_bins(self):
-        """Calculate optimal number of bins from Freedman-Diaconis rule
+    def optimal_n_bins(self) -> int:
+        """Calculates the optimal number of bins from Freedman-Diaconis rule.
+        See for example:
         https://stats.stackexchange.com/questions/798/calculating-optimal-number-of-bins-in-a-histogram
         https://en.wikipedia.org/wiki/Freedman–Diaconis_rule
 
@@ -205,26 +210,40 @@ Get the parameters and sigmas as determined by MCMC:
             return 0
         return int((self.xmax - self.xmin)*self.n_events**(1.0/3.0)/(2.0*iqr))
 
+    
+
     def calculate_histogram(self):
+        """Calculates a histogram of the weighted events using
+        numpy.histogram.  Just prepares the data, does not plot.  The
+        actual plotting is done by plot_histogram().
+
+        """
         if self.data is None:
             raise ValueError(
                 f"attempt to compute histogram with no data defined."
                 )
         
         # If we get here, we have events
+
+        #  Get the range of values for the events
         self.xmin=np.amin(self.data)
         self.xmax=np.amax(self.data)
-        
+
+        # Calculate the optimum number of histogram bins
         opt_n_bin = self.optimal_n_bins()
 
+        # Create that number of bins spanning the range of event values
         slic=(self.xmax - self.xmin)/(opt_n_bin+1)
         hbins = np.arange(self.xmin, self.xmax, slic)
 
+        # Maybe the events are weighted, maybe they aren't.  Handle both scenarios.
         if self.weights is None:
             hst = np.histogram(study_data, bins=hbins, density=True)
         else:
             hst = np.histogram(self.data, bins=hbins, density=True, weights=self.weights)
 
+        # Assign the object values that we'll need later on using the
+        # created numpy.histogram object.
         self.histo = hst
 
         x_hist = hst[1]
@@ -235,34 +254,65 @@ Get the parameters and sigmas as determined by MCMC:
         self.histx = x_hist
         self.histy = y_hist
         self.histe = e_hist
-            
+
+
         
-    def plot_histogram(self):
-        """ Plots a histogram of the events in the scipp fashion
+        
+    def plot_histogram(self, loglog=True, log=True):
+        """ Plots a histogram of the events in the scipp fashion.
+        Uses matplotlib of course.
+        Setting log=True makes the y-axis logarithmic.
+        Setting loglog=True makes both y- and x-axes logarithmic.
         """
         self.calculate_histogram()
-        
+
+        # Force the shape of the plot to be close to scipp for convenient comparisons.
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
+        # Plot the histogram as a step plot
         plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
-        plt.yscale('log')
-        plt.xscale('log')
+
+        # Maybe make the graph a log plot or log-log plot as appropriate
+        if log or loglog:
+            plt.yscale('log')
+        if loglog:
+            plt.xscale('log')
+
+        # Label the axes, add a legend, and show.
+        # TODO: maybe the units of x-axis are not Q...
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
         plt.legend()
         plt.show()
 
-    def plot_LSE_fit(self):
+
+        
+        
+    def plot_LSE_fit(self, loglog=True, log=True):
+        """ Plots a histogram of the events in the scipp fashion,
+        and overlays the least-squares fit of the data.
+        Uses matplotlib.
+        Setting log=True makes the y-axis logarithmic.
+        Setting loglog=True makes the x- and y-axes logarithmic.
+        """
+        
         self.calculate_histogram()
         
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
+        # Plot the histogram as a matplotlib step plot
         plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        # Plot the fit as a regular matplotlib plot
         plt.plot(self.histx, self.lse_result.best_fit, color='black', label="LSE fit")
-        
-        plt.yscale('log')
-        plt.xscale('log')
+
+        # Apply logarithmic axes as requested
+        if log or loglog:
+            plt.yscale('log')
+        if loglog:
+            plt.xscale('log')
+
+        # Rest of the nice features
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
@@ -274,14 +324,25 @@ Get the parameters and sigmas as determined by MCMC:
 
 
     def calculate_kde(self):
+        """ Computes the kernel density estimate of the weighted events.
+        Uses scipy's KDE method.  Scikit learn has more options for kernels,
+        but scipy has weighted points.  Some of the code here is legacy from
+        sklearn testing.
+        The plot of the kde is not done by this function, that is handled by 
+        plot_kde().
+        """
+        
         print("Calculating KDE")
-        reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
-        # still compute optimal number of grid points
+        #reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
+
+        # Compute optimal number of grid points in the same way as for
+        # histogram.  We should check this at some point, mabye this
+        # assumption is invalid.
         nx = self.optimal_n_bins()
         slic=(self.xmax - self.xmin)/(nx+1)
-        
         xgrid = np.arange(self.xmin, self.xmax, slic)
 
+        
         kde = gaussian_kde(self.data, bw_method=20*slic, weights=self.weights)
         xgrid_reshape = xgrid.reshape(-1, 1)
         kde_line = kde.evaluate(xgrid)
@@ -301,11 +362,18 @@ Get the parameters and sigmas as determined by MCMC:
         self.kdey = kde_line / integral
         self.kde = kde
 
+
         
-    def plot_kde(self, yspan=[None, None]):
+        
+    def plot_kde(self, ylimits=[None, None], log=True, loglog=True):
+        """ Plots the kernel density estimate of the data set.
+        Setting ylimits adds a manual range to the plot on the y-axis.
+        Setting log=True plots the y-axis on a log scale.
+        Setting loglog=True plots the y- and x-axes on a log scale.
+        
+        """
 
-
-        yr = np.asarray(yspan)
+        yr = np.asarray(ylimits)
 
         self.calculate_kde()
 
@@ -314,8 +382,10 @@ Get the parameters and sigmas as determined by MCMC:
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
         plt.plot(self.kdex, self.kdey, label='Optimal KDE')
-        plt.yscale('log')
-        plt.xscale('log')
+        if log or loglog:
+            plt.yscale('log')
+        if loglog:
+            plt.xscale('log')
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
@@ -326,7 +396,15 @@ Get the parameters and sigmas as determined by MCMC:
         plt.show()
         
 
-    def plot_MCMC_fit_with_histo(self):
+
+        
+    def plot_MCMC_fit_with_histo(self, log=True, loglog=True):
+        """ Plots a histogram of the weighted events.
+        Overlays a plot of the model PDF where each set of parameters
+        is obtained from each of the the MCMC walkers.  A converged
+        fit usually results in a single black line for the fit.  A poor
+        fit that is not well converged will show many gray lines.
+        """
 
         flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
 
@@ -352,8 +430,10 @@ Get the parameters and sigmas as determined by MCMC:
                 ax.plot(self.histx, yfit, color='black', alpha=0.2)
         
         plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
-        plt.yscale('log')
-        plt.xscale('log')
+        if log or loglog:
+            plt.yscale('log')
+        if log:
+            plt.xscale('log')
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
@@ -362,8 +442,13 @@ Get the parameters and sigmas as determined by MCMC:
 
 
         
-    def plot_MCMC_fit_with_kde(self):
-
+    def plot_MCMC_fit_with_kde(self, log=True, loglog=True):
+        """ Plots a KDE of the weighted events.
+        Overlays a plot of the model PDF where each set of parameters
+        is obtained from each of the the MCMC walkers.  A converged
+        fit usually results in a single black line for the fit.  A poor
+        fit that is not well converged will show many gray lines.
+        """
         flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
 
         inds = np.random.randint(len(flat_samples), size=30)
@@ -386,8 +471,10 @@ Get the parameters and sigmas as determined by MCMC:
         
         self.calculate_kde()
         ax.plot(self.kdex, self.kdey, color='blue', label='Optimal KDE')
-        plt.yscale('log')
-        plt.xscale('log')
+        if log or loglog:
+            plt.yscale('log')
+        if log:
+            plt.xscale('log')
         plt.ylabel('Intensity')
         plt.xlabel('Q (Å$^{-1}$)')
         plt.tight_layout()
@@ -395,16 +482,28 @@ Get the parameters and sigmas as determined by MCMC:
         plt.show()
 
 
-    def plot_MCMC_fit(self, method="kde"):
+    def plot_MCMC_fit(self, method="kde", log=True, loglog=True):
+        """ A convenience function that calls one of two methods,
+        either histogram or KDE.  See the documentation on those
+        two methods for more details.
+        """
         if method=="kde":
-            self.plot_MCMC_fit_with_kde()
+            self.plot_MCMC_fit_with_kde(log=log, loglog=loglog)
         if method=="histo":
-            self.plot_MCMC_fit_with_histo()
+            self.plot_MCMC_fit_with_histo(log=log, loglog=loglog)
 
             
 
     def plot_MCMC_convergences(self):
-        # Plot the theta curves during sampling
+        """
+        Plot the theta curves during the final stages of sampling.
+        Each parameter is plotted as a separate graph of 
+        parameter value vs iteration.  You can then see whether the fit
+        has converged well, since all walkers are basically moving
+        around the final value in a gaussian distribution.  If the
+        walkers are gradually increasing or decreasing you can
+        conclude that the fit has not converged.
+        """
         if self.ndim is None or self.ndim < 1:
             raise ValueError(
                 f"ndims is not defined so cannot subplot parameters."
@@ -443,12 +542,20 @@ Get the parameters and sigmas as determined by MCMC:
         
         
     def set_lse_function(self, func):
+        """ Assigns the least squares probability mass function.
+        This is passed through to the lmfit module and is called at 
+        each iteration of the least squares fit.
+        """
         self.least_squares_pmf_function = func
         self.least_squares_model = Model(self.least_squares_pmf_function)
         print("Least squares model function defined.")
 
 
     def make_lse_params(self, **kwgs):
+        """ Makes the LSE parameters according to the method of lmfit.
+        Basically this is an interface for that.  **kwgs are just passed
+        directly through.  See the lmfit documentation for more details.
+        """
         if self.least_squares_model is None:
             raise ValueError(
                 f"attempt to create parameters for an undefined model.  Define the model function first."
@@ -456,6 +563,8 @@ Get the parameters and sigmas as determined by MCMC:
         self.least_squares_parameters = self.least_squares_model.make_params(**kwgs)
 
     def lse_fit(self):
+        """ Calls lmfit to find a least squares fit to the pmf model.
+        """
         if self.histx.any() is None or self.histy.any() is None:
             self.calculate_histogram()
 
@@ -465,9 +574,14 @@ Get the parameters and sigmas as determined by MCMC:
                 )
         
         self.lse_result = self.least_squares_model.fit(self.histy, self.least_squares_parameters, x=self.histx)
-            
-    def get_lse_param_values(self):
-        # returns numpy array of best fit parameter values
+
+
+
+        
+    def get_lse_param_values(self) -> np.ndarray:
+        """ returns numpy array of best fit parameter values as 
+        determined by lmfit.
+        """
         valdict = self.lse_result.best_values
         vals = np.zeros(len(valdict))
 
@@ -477,9 +591,14 @@ Get the parameters and sigmas as determined by MCMC:
             i=i+1
         
         return vals
+    
 
-    def get_lse_param_names(self):
-        # returns array of parameter names
+    def get_lse_param_names(self) -> list[str]:
+        """ returns array of parameter names as defined in the 
+        lmfit parameters object.  Saves you having to keep
+        track of those parameter names yourself when plotting
+        graphs.
+        """
         valdict = self.lse_result.best_values
         vals = [None]*len(valdict)
 
@@ -491,11 +610,17 @@ Get the parameters and sigmas as determined by MCMC:
         return vals
 
 
-    def get_lse_param_sigmas(self):
-        # returns numpy array of best fit parameter sigmas
+    def get_lse_param_sigmas(self) -> np.ndarray:
+        """ returns numpy array of sigma values for the fit parameters
+        from lmfit.
+        """
+
+        # Before we get into the meat of this, if the lmfit is not
+        # a good fit then the sigmas are not defined.  We have to check
+        # for that first.
         if  self.lse_result.result.uvars != None:
             uvars = self.lse_result.result.uvars
-            sigmas =  np.zeros(len(uvars))
+            sigmas =  np.full(len(uvars), np.inf)
             
             i = 0
             for key in uvars:
@@ -503,16 +628,21 @@ Get the parameters and sigmas as determined by MCMC:
                 i=i+1
 
         else:
+            # Here the fit was in some way bad.
+            # If the fit returned parameter values, this means that
+            # the uncertainties are infinite for each parameter.
+            # If there was no parameter best values, then the fit didn't work.
+            # In either case, we return infinity with an appropriate shape.
             if self.lse_result.best_values != None:
-                sigmas = np.zeros(len(self.lse_result.best_values))
+                sigmas = np.full(len(self.lse_result.best_values), np.inf)
             else:
-                sigmas = np.asarray(0.0)
+                sigmas = np.asarray(np.inf)
         
         return sigmas
 
     
 
-    def subsample(self, subsample_size):
+    def subsample(self, subsample_size: int) -> Analyser:
         # Randomly subsamples the events to a smaller data size.
         # Returns a deep copy of the object.
 
@@ -540,7 +670,24 @@ Get the parameters and sigmas as determined by MCMC:
         return(copyobj)
         
 
+
+    
     def MCMC_fit(self, nburn=50, niter=200):
+        """Performs the weighted MCMC fit of the event data.
+
+        nburn is the number of iterations to use for burn-in.
+
+        niter is the number of iterations to use for the actual
+        analysis.
+
+        NOTE: if the parameter samples are noisy, undersampled, and or
+        posterized, as seen in the plot_MCMC_parameter_distribution()
+        then increasing niter does NOT improve the statistics.
+        Increasing the number of EVENTS improves the statistics of the
+        parameters.
+
+        """
+        
         p0 = np.asarray(self.theta_seed)
         self.ndim = p0.size
         
@@ -585,7 +732,14 @@ Get the parameters and sigmas as determined by MCMC:
         self.sampler.run_mcmc(state, niter, progress=True);
 
 
-    def get_MCMC_parameters(self):
+
+        
+    def get_MCMC_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Returns the mean and standard deviation of each parameter as
+        determined by MCMC.  The results are returned as a tuple.
+
+        """
+        
         samples=self.sampler.get_chain(flat=True)
 
         self.mcmc_parameter_values = np.zeros(self.ndim)
@@ -600,7 +754,23 @@ Get the parameters and sigmas as determined by MCMC:
         return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
         
 
+
+    
     def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False):
+        """Plots the distribution of the <item>th parameter sampled by MCMC.
+        This can be useful to see the quality of the convergence for the
+        parameter in question.  Specifically we are interested to know:
+
+        1) Is it sampled enough (i.e. does it look like a smooth-ish gaussian)?
+        2) Is it posterized (i.e. is it a few points repeated over and over)?  
+        3) Is it noisy?
+
+        If any of those are true, in means that the parameter space is
+        too discrete and undersampled.  We fix it not with the number
+        of iterations, which feels logical, but with the number of
+        EVENTS which makes the parameter space less discrete.
+
+        """
 
         samps = self.sampler.get_chain(flat=True)
 
