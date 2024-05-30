@@ -808,16 +808,23 @@ Get the parameters and sigmas as determined by MCMC:
         print("MCMC launch")
 
 
-        # Create a spread of randomised starting points for each walker, that is
-        # clustered around the seed position
-        p0 = [p0 + 1e-5 * np.random.randn(self.ndim) for k in range(self.nwalkers)]
-
         # Create local copies of the class variables we need to pass to MCMC
         # MCMC cannot see inside objects
         myllf = self.llf
         nwk = self.nwalkers
         ndm = self.ndim
 
+        # Avoid a runtime error in MCMC where the number of walkers is less than
+        # 2x the number of dimensions
+        if nwk < 2*ndm:
+            nwk = 2*ndm+1
+            self.nwalkers = nwk
+
+        # Create a spread of randomised starting points for each walker, that is
+        # clustered around the seed position
+        p0 = [p0 + 1e-5 * np.random.randn(self.ndim) for k in range(self.nwalkers)]
+
+            
         # If the weights array is badly defined or not defined, use unity weights.
         if self.weights.any() is None:
             self.weights = np.ones_like(self.data)
@@ -919,13 +926,12 @@ Get the parameters and sigmas as determined by MCMC:
             refLSE = True
             # get the parameter names
             pnams = self.get_lse_param_names()
-            # remove the "amplitude" parameter because that does not apply for this way of
-            # doing MCMC on the x-axis
-            pnams = pnams[1:]
+
             # extract the relevant element from the name, value, and sigma
-            pnam = pnams[item]
-            lse_pval = lsp[item]
-            lse_eval = lsee[item]
+            # Don't forget that the LSE results have an amplitude parameter!
+            pnam = pnams[item+1]
+            lse_pval = lsp[item+1]
+            lse_eval = lsee[item+1]
             # create a label texts from that info 
             lstxt   = "LSE value " + str(round(lse_pval,4))
             xlab = pnam
