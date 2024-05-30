@@ -358,7 +358,38 @@ Get the parameters and sigmas as determined by MCMC:
         plt.show()
 
 
+    def plot_LSE_initial(self, loglog=True, log=True):
+        """ Plots a histogram of the events in the scipp fashion,
+        and overlays the least-squares initial PDF using the starting
+        parameter values.
+        Uses matplotlib.
+        Setting log=True makes the y-axis logarithmic.
+        Setting loglog=True makes the x- and y-axes logarithmic.
+        """
+        self.calculate_histogram()
+        
+        plt.rcParams["figure.figsize"] = (5.75,3.5)
 
+        evaly = self.least_squares_model.eval(x=self.histx, params=self.least_squares_parameters)
+
+        # Plot the histogram as a matplotlib step plot
+        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        # Plot the fit as a regular matplotlib plot
+        plt.plot(self.histx, evaly, color='black', label="LSE starting parameters")
+
+        # Apply logarithmic axes as requested
+        if log or loglog:
+            plt.yscale('log')
+        if loglog:
+            plt.xscale('log')
+
+        # Rest of the nice features
+        plt.ylabel('Intensity')
+        plt.xlabel('Q (Å$^{-1}$)')
+        plt.tight_layout()
+        plt.legend()
+        plt.show()
+        
 
 
     def calculate_kde(self):
