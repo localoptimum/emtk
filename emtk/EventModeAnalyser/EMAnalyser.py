@@ -294,7 +294,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         
         
-    def plot_histogram(self, loglog=True, log=True):
+    def plot_histogram(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots a histogram of the events in the scipp fashion.
         Uses matplotlib of course.
         Setting log=True makes the y-axis logarithmic.
@@ -319,7 +319,7 @@ Get the parameters and sigmas as determined by MCMC:
         # Label the axes, add a legend, and show.
         # TODO: maybe the units of x-axis are not Q...
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
         plt.show()
@@ -327,7 +327,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         
         
-    def plot_LSE_fit(self, loglog=True, log=True):
+    def plot_LSE_fit(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots a histogram of the events in the scipp fashion,
         and overlays the least-squares fit of the data.
         Uses matplotlib.
@@ -352,13 +352,13 @@ Get the parameters and sigmas as determined by MCMC:
 
         # Rest of the nice features
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
         plt.show()
 
 
-    def plot_LSE_initial(self, loglog=True, log=True):
+    def plot_LSE_initial(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots a histogram of the events in the scipp fashion,
         and overlays the least-squares initial PDF using the starting
         parameter values.
@@ -385,7 +385,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         # Rest of the nice features
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
         plt.show()
@@ -441,7 +441,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         
         
-    def plot_kde(self, ylimits=[None, None], log=True, loglog=True):
+    def plot_kde(self, ylimits=[None, None], log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots the kernel density estimate of the data set.
         Setting ylimits adds a manual range to the plot on the y-axis.
         Setting log=True plots the y-axis on a log scale.
@@ -471,7 +471,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         # Label axes and trim off the fat on the figure
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
 
         # Apply manual limits if specified
@@ -485,7 +485,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
         
-    def plot_MCMC_fit_with_histo(self, log=True, loglog=True):
+    def plot_MCMC_fit_with_histo(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots a histogram of the weighted events.
         Overlays a plot of the model PDF where each set of parameters
         is obtained from each of the the MCMC walkers.  A converged
@@ -524,14 +524,14 @@ Get the parameters and sigmas as determined by MCMC:
         if log:
             plt.xscale('log')
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
         plt.show()
 
 
         
-    def plot_MCMC_fit_with_kde(self, log=True, loglog=True):
+    def plot_MCMC_fit_with_kde(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
         """ Plots a KDE of the weighted events.
         Overlays a plot of the model PDF where each set of parameters
         is obtained from each of the the MCMC walkers.  A converged
@@ -565,21 +565,21 @@ Get the parameters and sigmas as determined by MCMC:
         if log:
             plt.xscale('log')
         plt.ylabel('Intensity')
-        plt.xlabel('Q (Å$^{-1}$)')
+        plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
         plt.show()
 
 
-    def plot_MCMC_fit(self, method="kde", log=True, loglog=True):
+    def plot_MCMC_fit(self, method="kde", log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
         """ A convenience function that calls one of two methods,
         either histogram or KDE.  See the documentation on those
         two methods for more details.
         """
         if method=="kde":
-            self.plot_MCMC_fit_with_kde(log=log, loglog=loglog)
+            self.plot_MCMC_fit_with_kde(log=log, loglog=loglog, xlabel=xlabel)
         if method=="histo":
-            self.plot_MCMC_fit_with_histo(log=log, loglog=loglog)
+            self.plot_MCMC_fit_with_histo(log=log, loglog=loglog, xlabel=xlabel)
 
             
 
