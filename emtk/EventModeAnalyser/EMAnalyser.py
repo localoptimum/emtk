@@ -327,7 +327,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         
         
-    def plot_LSE_fit(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)'):
+    def plot_LSE_fit(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)', save=""):
         """ Plots a histogram of the events in the scipp fashion,
         and overlays the least-squares fit of the data.
         Uses matplotlib.
@@ -355,10 +355,14 @@ Get the parameters and sigmas as determined by MCMC:
         plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
+        if save != "":
+            plt.savefig(fname=save)
+
         plt.show()
 
 
-    def plot_LSE_initial(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)'):
+
+    def plot_LSE_initial(self, loglog=True, log=True, xlabel='Q (Å$^{-1}$)', save=""):
         """ Plots a histogram of the events in the scipp fashion,
         and overlays the least-squares initial PDF using the starting
         parameter values.
@@ -388,8 +392,10 @@ Get the parameters and sigmas as determined by MCMC:
         plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
+        if save != "":
+            plt.savefig(fname=save)
         plt.show()
-        
+
 
 
     def calculate_kde(self):
@@ -485,7 +491,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
         
-    def plot_MCMC_fit_with_histo(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
+    def plot_MCMC_fit_with_histo(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)', save=""):
         """ Plots a histogram of the weighted events.
         Overlays a plot of the model PDF where each set of parameters
         is obtained from each of the the MCMC walkers.  A converged
@@ -527,11 +533,14 @@ Get the parameters and sigmas as determined by MCMC:
         plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
+
+        if save != "":
+            plt.savefig(fname=save)
+
         plt.show()
 
-
         
-    def plot_MCMC_fit_with_kde(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
+    def plot_MCMC_fit_with_kde(self, log=True, loglog=True, xlabel='Q (Å$^{-1}$)', save=""):
         """ Plots a KDE of the weighted events.
         Overlays a plot of the model PDF where each set of parameters
         is obtained from each of the the MCMC walkers.  A converged
@@ -568,18 +577,23 @@ Get the parameters and sigmas as determined by MCMC:
         plt.xlabel(xlabel)
         plt.tight_layout()
         plt.legend()
+
+        if save != "":
+            plt.savefig(fname=save)
+
         plt.show()
 
+        
 
-    def plot_MCMC_fit(self, method="kde", log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
+    def plot_MCMC_fit(self, method="kde", log=True, loglog=True, xlabel='Q (Å$^{-1}$)', save=""):
         """ A convenience function that calls one of two methods,
         either histogram or KDE.  See the documentation on those
         two methods for more details.
         """
         if method=="kde":
-            self.plot_MCMC_fit_with_kde(log=log, loglog=loglog, xlabel=xlabel)
+            self.plot_MCMC_fit_with_kde(log=log, loglog=loglog, xlabel=xlabel, save=save)
         if method=="histo":
-            self.plot_MCMC_fit_with_histo(log=log, loglog=loglog, xlabel=xlabel)
+            self.plot_MCMC_fit_with_histo(log=log, loglog=loglog, xlabel=xlabel, save=save)
 
             
 
