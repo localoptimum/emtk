@@ -719,23 +719,25 @@ Get the parameters and sigmas as determined by MCMC:
         """
 
         # Before we get into the meat of this, if the lmfit is not
-        # a good fit then the sigmas are not defined.  We have to check
-        # for that first.
-        if  self.lse_result.result.uvars != None:
+        # a good fit then the sigmas are not defined.
+
+        try:
             uvars = self.lse_result.result.uvars
             sigmas =  np.full(len(uvars), np.inf)
-            
+
             i = 0
             for key in uvars:
                 sigmas[i] = uvars[key].std_dev
                 i=i+1
 
-        else:
+        except AttributeError: # 'MinimizerResult' object has no attribute 'uvars'            
             # Here the fit was in some way bad.
             # If the fit returned parameter values, this means that
             # the uncertainties are infinite for each parameter.
             # If there was no parameter best values, then the fit didn't work.
             # In either case, we return infinity with an appropriate shape.
+            print("WARNING: least squares uncertainties are not defined.  Fit is probably not good.")
+            
             if self.lse_result.best_values != None:
                 sigmas = np.full(len(self.lse_result.best_values), np.inf)
             else:
@@ -924,7 +926,10 @@ Get the parameters and sigmas as determined by MCMC:
 
         # We might also like to compare against least squares, so lets get those results
         lsp = np.asarray(self.least_squares_parameters)
-        lsee = self.get_lse_param_sigmas()
+        if compare:
+            lsee = self.get_lse_param_sigmas()
+            # that produces warnings if the fit is not defined / not good
+            # only run it if we actually want to do the comparison
 
         # if there are no valid least squares results, or the user does not want a comparison,
         # then our results are simple
