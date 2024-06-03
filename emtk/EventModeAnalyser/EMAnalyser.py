@@ -782,7 +782,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
     
-    def MCMC_fit(self, nburn=50, niter=200):
+    def MCMC_fit(self, nburn=50, niter=1000):
         """Performs the weighted MCMC fit of the event data.
 
         nburn is the number of iterations to use for burn-in.
@@ -847,18 +847,44 @@ Get the parameters and sigmas as determined by MCMC:
         # otherwise we assume the weights supplied by the user are correct and just proceed.
         
         # Set up the sampler.
-        self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
+        backend = emcee.backends.HDFBackend("arcs_sampler_backend.h5")
+        backend.reset(nwk, ndm)
+        
+        self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, backend=backend, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
         
         # Run a burn-in chain and save the final location
-        print("Burn in:")
-        state = self.sampler.run_mcmc(p0, nburn, progress=True)
-    
+        #print("Burn in:")
+        #state = self.sampler.run_mcmc(p0, nburn, progress=True)
+
+
         # Run the production chain.
         self.sampler.reset()
         print("Sampling:")
-        self.sampler.run_mcmc(state, niter, progress=True);
 
+        # Uses the autocorrelation metric as shown on the emcee website
 
+        index = 0
+        autocorr = np.empty(niter)
+
+        old_tau = np.inf
+
+        for sample in self.sampler.sample(p0, iterations=niter, progress=True, store=True):
+            # Only check every 50 steps
+            if self.sampler.iteration % 100:
+                continue
+            
+            tau = self.sampler.get_autocorr_time(discard=50)
+
+            print(tau)
+            
+            autocorr[index] = np.mean(tau)
+            index += 1
+
+            converged = np.all(tau * 100 < self.sampler.iteration)
+            converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
+            if converged:
+                break
+            old_tau = tau
 
         
     def get_MCMC_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -992,3 +1018,27 @@ Get the parameters and sigmas as determined by MCMC:
         plt.show()
 
 
+
+        
+    def gelman_rubin_statistic(self) -> np.ndarray :
+
+        chains = self.sampler.get_chain()
+            
+        nwk = self.nwalkers # "J"
+        ndm = self.ndim
+        nsamps = chains.shape[0] #"L"
+
+        chain_mean = np.mean(chains, axis=0)        
+        grand_mean = np.mean(chain_mean, axis=0)
+
+        within_chain_variance = 1.0 / (nsamps - 1.0) * np.sum( (chains - grand_mean)**2.0, axis=0)
+        between_chain_variance = nsamps/(nwk - 1.0) * np.sum( (chain_mean - grand_mean)**2.0, axis=0)
+        
+        ww = (1.0 / nwk) * np.sum(within_chain_variance, axis=0)
+        
+        t1 = (nsamps-1.0)*ww / nsamps
+        t2 = between_chain_variance / nsamps
+        
+        grstat = (t1 + t2) / ww
+        
+        return grstat
