@@ -49,6 +49,8 @@ class EMAnalyser:
         
         self.kde = None
 
+        self.sampler = None
+
         self.theta_seed = None
         self.nwalkers = 32 # just leave this alone probably
         self.ndims = None
@@ -782,7 +784,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
     
-    def MCMC_fit(self, nburn=50, niter=1000):
+    def MCMC_fit(self, nburn=50, niter=200, convergence="None"):
         """Performs the weighted MCMC fit of the event data.
 
         nburn is the number of iterations to use for burn-in.
@@ -797,6 +799,11 @@ Get the parameters and sigmas as determined by MCMC:
         parameters.
 
         """
+
+        # Check input parameters
+        if not (convergence == "None" or convergence == "Autocorrelation" or convergence == "Gelman-Rubin"):
+            print('ERROR: convergence must be one of "None", "Autocorrelation" or "Gelman-Rubin"')
+            return
 
         # Force the parameter seed values to be a numpy array
         p0 = np.asarray(self.theta_seed)
@@ -845,48 +852,109 @@ Get the parameters and sigmas as determined by MCMC:
         if self.weights.any() is None:
             self.weights = np.ones_like(self.data)
         # otherwise we assume the weights supplied by the user are correct and just proceed.
+
+
+        # The first option is that there is no convergence criterion, so we just do a normal
+        # burn and sample
+
+        if convergence == "None":
+
+            self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
+            # Run a burn-in chain and save the final location
+            print("Burn in:")
+            state = self.sampler.run_mcmc(p0, nburn, progress=True)
+
+            # Run the production chain.
+            self.sampler.reset()
+            print("Sampling:")
+            self.sampler.run_mcmc(state, niter, progress=True)
+
+            print("MCMC sampling complete.")
+
+
+        # The second option is that the user wants to use autocorrelation.
+        # This is under development and doesn't actually work yet
         
-        # Set up the sampler.
-        backend = emcee.backends.HDFBackend("arcs_sampler_backend.h5")
-        backend.reset(nwk, ndm)
-        
-        self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, backend=backend, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
-        
-        # Run a burn-in chain and save the final location
-        #print("Burn in:")
-        #state = self.sampler.run_mcmc(p0, nburn, progress=True)
+        if convergence == "Autocorrelation":
 
-
-        # Run the production chain.
-        self.sampler.reset()
-        print("Sampling:")
-
-        # Uses the autocorrelation metric as shown on the emcee website
-
-        index = 0
-        autocorr = np.empty(niter)
-
-        old_tau = np.inf
-
-        for sample in self.sampler.sample(p0, iterations=niter, progress=True, store=True):
-            # Only check every 50 steps
-            if self.sampler.iteration % 100:
-                continue
+            print("WARNING: Autocorrelation convergence monitoring is an option under development and doesn't actually work yet...")
             
-            tau = self.sampler.get_autocorr_time(discard=50)
-
-            print(tau)
-            
-            autocorr[index] = np.mean(tau)
-            index += 1
-
-            converged = np.all(tau * 100 < self.sampler.iteration)
-            converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
-            if converged:
-                break
-            old_tau = tau
-
+            # Set up the sampler.
+            backend = emcee.backends.HDFBackend("autocorrelation_sampler_backend.h5")
+            backend.reset(nwk, ndm)
         
+            self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, backend=backend, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
+        
+            # Run the production chain.
+            self.sampler.reset()
+            print("Sampling:")
+
+            # Uses the autocorrelation metric as shown on the emcee website
+            
+            index = 0
+            autocorr = np.empty(niter)
+
+            old_tau = np.inf
+
+            for sample in self.sampler.sample(p0, iterations=niter, progress=True, store=True):
+                # Only check every 100 steps
+                if self.sampler.iteration % 100:
+                    continue
+                
+                tau = self.sampler.get_autocorr_time(discard=50)
+
+                print(tau)
+            
+                autocorr[index] = np.mean(tau)
+                index += 1
+
+                converged = np.all(tau * 100 < self.sampler.iteration)
+                converged &= np.all(np.abs(old_tau - tau) / tau < 0.01)
+                if converged:
+                    break
+                old_tau = tau
+
+
+                
+        # The third option is to use the Gelman-Rubin statistic
+        # This is under development and doesn't work yet
+
+        if convergence == "Gelman-Rubin":
+
+            print("WARNING: Gelman-Rubin convergence monitoring is an option under development and doesn't actually work yet...")
+
+            # Set up the sampler.
+            backend = emcee.backends.HDFBackend("gelman-rubin_sampler_backend.h5")
+            backend.reset(nwk, ndm)
+        
+            self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, backend=backend, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
+        
+            # Run the production chain.
+            self.sampler.reset()
+            print("Sampling:")
+
+            for sample in self.sampler.sample(p0, iterations=niter, progress=True, store=True):
+                # Only check every 100 steps
+                if self.sampler.iteration % 100:
+                    continue
+                
+                grs_array = self.gelman_rubin_statistic()
+
+                grs = np.amax(grs_array)
+
+                print("Current Gelman-Rubin statistic:", grs)
+            
+                converged = (grs < 1.2)
+                terminate = (self.sampler.iteration > niter)
+
+                if converged or terminate:
+                    break
+
+                # Can give feedback on whether it was a convergence or a termination...
+        
+
+            
+                
     def get_MCMC_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
         """Returns the mean and standard deviation of each parameter as
         determined by MCMC.  The results are returned as a tuple.
@@ -896,6 +964,9 @@ Get the parameters and sigmas as determined by MCMC:
         # Grab a flat markov chain from the sampler
         samples=self.sampler.get_chain(flat=True)
 
+        nn = samples.shape[0]
+        rootn = np.sqrt(nn)
+
         # initialise the result arrays
         self.mcmc_parameter_values = np.zeros(self.ndim)
         self.mcmc_parameter_sigmas = np.zeros(self.ndim)
@@ -903,10 +974,15 @@ Get the parameters and sigmas as determined by MCMC:
         # Figure out how many parameters there are
         rge = range(self.ndim)
 
-        # For each parameter, get the mean and standar deviation from the markov chain samples
+        # For each parameter, get the mean and standard error from the markov chain samples
         for i in rge:
+            # The parameter value is the mean of each parameter dimension
+            # in the chain
             self.mcmc_parameter_values[i] = np.mean(samples[:,i])
-            self.mcmc_parameter_sigmas[i] = np.std(samples[:,i])
+            # The standard error is the standard deviation of each parameter
+            # dimension in the chain divided by the square root of the
+            # number of samples
+            self.mcmc_parameter_sigmas[i] = np.std(samples[:,i])/rootn
 
         # Return the means and standard deviations as a tuple
         return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
@@ -1021,6 +1097,12 @@ Get the parameters and sigmas as determined by MCMC:
 
         
     def gelman_rubin_statistic(self) -> np.ndarray :
+
+        # Something is a bit wrong with this.
+        # The statistic is starting out at a value of 2
+        # in the ARCS test notebook and gently increasing
+        # It should not be behaving in this way, there is obviously
+        # a mistake in the maths below...
 
         chains = self.sampler.get_chain()
             
