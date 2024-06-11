@@ -756,23 +756,38 @@ Get the parameters and sigmas as determined by MCMC:
         # Make a deep copy of the self object
         copyobj = copy.deepcopy(self)
 
-        # Choose a random subset of the data elements
-        rng = np.random.default_rng()
-        elements = rng.choice(copyobj.n_events, subsample_size)
+        if subsample_size < copyobj.n_events:
+            # Choose a random subset of the data elements
+            rng = np.random.default_rng()
+            elements = rng.choice(copyobj.n_events, subsample_size)
 
-        # get a local copy of those data elements
-        subsample = copyobj.data[elements]
-        subweights = copyobj.weights[elements]
+            # get a local copy of those data elements
+            subsample = copyobj.data[elements]
+            subweights = copyobj.weights[elements]
 
-        # Write them over to the copy object
-        copyobj.data = subsample
-        copyobj.weights = subweights
-        copyobj.n_events = subsample_size
+            # Write them over to the copy object
+            copyobj.data = subsample
+            copyobj.weights = subweights
+            copyobj.n_events = subsample_size
+
+        else:
+            # save time and just leave the copy intact.
+            # A user is unlikely to do this but maybe
+            # they are scripting something that tries to
+            # subsample a larger number of events from a data set
+            # than exists
+
+            print("WARNING: attempt to subsample", subsample_size, "events from a data set with", copyobj.n_events, "elements")
+            print("Subsample will return a direct copy of the data instead.")
+
+        
 
         # Overwite the copy object data range
         copyobj.xmin = np.amin(copyobj.data)
         copyobj.xmax = np.amax(copyobj.data)
 
+        
+            
         # reset the copy object class variables
         copyobj.lse_result = None
         copyobj.histo = None
