@@ -50,6 +50,7 @@ class EMAnalyser:
         self.kde = None
 
         self.sampler = None
+        self.sampler_state = None
 
         self.theta_seed = None
         self.nwalkers = 32 # just leave this alone probably
@@ -877,12 +878,12 @@ Get the parameters and sigmas as determined by MCMC:
             self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
             # Run a burn-in chain and save the final location
             print("Burn in:")
-            state = self.sampler.run_mcmc(p0, nburn, progress=True)
+            self.sampler_state = self.sampler.run_mcmc(p0, nburn, progress=True)
 
             # Run the production chain.
             self.sampler.reset()
             print("Sampling:")
-            self.sampler.run_mcmc(state, niter, progress=True)
+            self.sampler_state = self.sampler.run_mcmc(self.sampler_state, niter, progress=True)
 
             print("MCMC sampling complete.")
 
@@ -1111,7 +1112,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
         
-    def gelman_rubin_statistic(self) -> np.ndarray :
+    def gelman_rubin_statistic(self, nburn=-1) -> np.ndarray :
 
         # Something is a bit wrong with this.
         # The statistic is starting out at a value of 2
@@ -1125,6 +1126,23 @@ Get the parameters and sigmas as determined by MCMC:
         ndm = self.ndim
         nsamps = chains.shape[0] #"L"
 
+        if nburn < 0:
+            # Automatically figure out how many iterations are burn in
+            nburn = int(nsamps / 2)
+
+        print(nsamps, "samples in chain.")
+        
+        print("Burning first", nburn, "samples for GR statistic.")
+
+        nkeep = nsamps - nburn
+
+        print("Kept", nkeep, "samples.")
+        
+        chains = chains[-nkeep::]
+        #= np.delete(chains, np.s_[0:nsamps-nkeep], axis=0)
+
+
+        # Now compute the statistic with the remaining chains
         chain_mean = np.mean(chains, axis=0)        
         grand_mean = np.mean(chain_mean, axis=0)
 
