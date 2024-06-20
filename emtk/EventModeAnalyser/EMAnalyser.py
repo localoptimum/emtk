@@ -944,13 +944,188 @@ Get the parameters and sigmas as determined by MCMC:
             backend.reset(nwk, ndm)
          
             self.sampler = emcee.EnsembleSampler(nwk, ndm, myllf, backend=backend, args=[self.data, self.xmin, self.xmax, self.weights, self.lpf])
-         
+
+
+            # Run the production chain.
+            self.sampler.reset()
+            print("Sampling:")
+
+            for sample in self.sampler.sample(p0, iterations=niter, progress=True, store=True):
+                # Only check every 100 steps
+                if self.sampler.iteration % 100:
+                    continue
+                
+                grs_array = self.gelman_rubin_statistic()
+
+                grs = np.amax(grs_array)
+
+                print("Current Gelman-Rubin statistic:", grs)
+            
+                converged = (grs < 1.2)
+                terminate = (self.sampler.iteration > niter)
+
+                if converged or terminate:
+                    break
+
+                # Can give feedback on whether it was a convergence or a termination...
+        
+
+            
+                
+    def get_MCMC_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Returns the mean and standard deviation of each parameter as
+        determined by MCMC.  The results are returned as a tuple.
+
+        """
+
+        # Grab a flat markov chain from the sampler
+        samples=self.sampler.get_chain(flat=True)
+
+        nn = samples.shape[0]
+        rootn = np.sqrt(nn)
+
+        # initialise the result arrays
+        self.mcmc_parameter_values = np.zeros(self.ndim)
+        self.mcmc_parameter_sigmas = np.zeros(self.ndim)
+
+        # Figure out how many parameters there are
+        rge = range(self.ndim)
+
+        # For each parameter, get the mean and standard error from the markov chain samples
+        for i in rge:
+            # The parameter value is the mean of each parameter dimension
+            # in the chain
+            self.mcmc_parameter_values[i] = np.mean(samples[:,i])
+            # The standard error is the standard deviation of each parameter
+            # dimension in the chain divided by the square root of the
+            # number of samples
+            self.mcmc_parameter_sigmas[i] = np.std(samples[:,i])/rootn
+
+        # Return the means and standard deviations as a tuple
+        return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
+
+
+    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False):
+        """Plots the distribution of the <item>th parameter sampled by MCMC.
+        This can be useful to see the quality of the convergence for the
+        parameter in question.  Specifically we are interested to know:
+
+        1) Is it sampled enough (i.e. does it look like a smooth-ish gaussian)?
+        2) Is it posterized (i.e. is it a few points repeated over and over)?  
+        3) Is it noisy?
+
+        If any of those are true, in means that the parameter space is
+        too discrete and undersampled.  We fix it not with the number
+        of iterations, which feels logical, but with the number of
+        EVENTS which makes the parameter space less discrete.
+
+        """
+
+        # Get a flat chain 
+        samps = self.sampler.get_chain(flat=True)
+
+        # Figure out how many parameters there are
+        npars = samps.shape[1]
+
+        # Protect against bad user input for which parameter to investigate.
+        if item < 0 or item >= npars:
+            raise ValueError(
+                f"attempt to analyse a parameter with an index that is out of the range of the number of available parameters."
+                )
+
+        # Get the mean and standard deviation of the markov chain samples
+        p_mean = np.mean(samps[:,item])
+        p_stddev = np.std(samps[:,item])
+    
+        # calculate the size graphical error bar to put on the plot
+        barmin = p_mean - p_stddev
+        barmax = p_mean + p_stddev
+
+        # We might also like to compare against least squares, so lets get those results
+        lsp = np.asarray(self.least_squares_parameters)
+        if compare:
+            lsee = self.get_lse_param_sigmas()
+            # that produces warnings if the fit is not defined / not good
+            # only run it if we actually want to do the comparison
+
+        # if there are no valid least squares results, or the user does not want a comparison,
+        # then our results are simple
+        if lsp.any() is None or lsp.size < 1 or compare==False:
+            # we dont' do the comparison
+            refLSE = False
+            # Create text labels based on the parameters
+            pnam= "parameter [" + str(item) + "]"
+            xlab = pnam
+            ylab = "p(" + xlab + ")"
+        else:
+            # there are valid least squares results and the user wants to have a comparison
+            refLSE = True
+            # get the parameter names
+            pnams = self.get_lse_param_names()
+
+            # extract the relevant element from the name, value, and sigma
+            # Don't forget that the LSE results have an amplitude parameter!
+            pnam = pnams[item+1]
+            lse_pval = lsp[item+1]
+            lse_eval = lsee[item+1]
+            # create a label texts from that info 
+            lstxt   = "LSE value " + str(round(lse_pval,4))
+            xlab = pnam
+            ylab = "p(" + xlab + ")"
+
+        # Create a text label from the MCMC result
+        fittxt = "MCMC value " + str(round(p_mean,4))
+
+        # Make a histogram of the data points
+        hst=plt.hist(samps[:,item], bins='auto', color='k', histtype="step")
+        # figure out the maximum y value of that histogram
+        ytop = np.amax(hst[0])
+        # Label the axes accordingly with the previously established texts
+        plt.xlabel(xlab)
+        plt.ylabel(ylab)
+        # The centre point and standard deviation are overlayed as a cross
+        plt.vlines(p_mean, 0, ytop, color="red")
+        plt.hlines(y=ytop*0.5, xmin=barmin, xmax=barmax, color="red")
+
+        # The parameter value is appended at the top of the centre bar
+        plt.text(p_mean, ytop*0.97, fittxt, color="red")
+
+        
+        if refLSE:
+            # if the comparison with LSE is done, we also make a blue cross marking the estimate
+            # centre value, standard deviation, and text label at the top
+            plt.vlines(lse_pval, 0, ytop*0.9, ls='--', color='b')
+            plt.hlines(y=ytop*0.9*0.5, xmin=lse_pval-lse_eval, xmax=lse_pval+lse_eval, ls='--', color='b')
+            plt.text(lse_pval*1.005, ytop*0.87, lstxt, color="b")
+
+        # Apply logarithmic axis scaling if required:
+        if log or loglog:
+            plt.xscale('log')
+
+        if loglog:
+            plt.yscale('log')
+
+        # Show the plot
+        plt.show()
+
+
+
+
+
            
+    def gelman_rubin_statistic(self) -> np.ndarray :
+
+        chains = self.sampler.get_chain()
+            
+        nwk = self.nwalkers # "J"
+        ndm = self.ndim
+        nsamps = chains.shape[0] #"L"
+
+        nkeep = int(nsamps / 2.0)
         
         chains = chains[-nkeep::]
-        #= np.delete(chains, np.s_[0:nsamps-nkeep], axis=0)
-
-
+        
+        
         # Now compute the statistic with the remaining chains
         chain_mean = np.mean(chains, axis=0)        
         grand_mean = np.mean(chain_mean, axis=0)
