@@ -401,7 +401,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
 
-    def calculate_kde(self):
+    def calculate_kde(self, logarithmic=True):
         """ Computes the kernel density estimate of the weighted events.
         Uses scipy's KDE method.  Scikit learn has more options for kernels,
         but scipy has weighted points.  Some of the code here is legacy from
@@ -411,6 +411,19 @@ Get the parameters and sigmas as determined by MCMC:
         """
         
         print("Calculating KDE")
+
+        # If a logarithmic x-axis is requested, then the data must be
+        # put on a logarithmic axis first
+        if logarithmic:
+            print("   logarithmic binning")
+            self.data = np.log10(self.data)
+            self.xmax = np.amax(self.data)
+            self.xmin = np.amin(self.data)
+            print("   range", self.xmin, self.xmax, "on log scale")
+        else:
+            print("   linear binning")
+            print("   range", self.xmin, self.xmax, "on linear scale")
+            
         #reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
 
         # Compute optimal number of grid points in the same way as for
@@ -422,10 +435,14 @@ Get the parameters and sigmas as determined by MCMC:
 
         # Call scipy's gaussian_kde method.
         # In testing I find that a bandwidth of
-        # 20x the histogram bin width looks right
+        # 20x the histogram bin width looks right on a linear binning
 
         # TODO: a parameterisation of the bandwidth method
-        kde = gaussian_kde(self.data, bw_method=20*slic, weights=self.weights)
+        
+        kde = gaussian_kde(self.data, bw_method="scott", weights=self.weights)
+        #kde = gaussian_kde(self.data, bw_method="silverman", weights=self.weights)
+        
+        #kde = gaussian_kde(self.data, bw_method=slic, weights=self.weights)
         # xgrid_reshape = xgrid.reshape(-1, 1) # scikit learn again
         kde_line = kde.evaluate(xgrid)
 
@@ -443,9 +460,26 @@ Get the parameters and sigmas as determined by MCMC:
         integral = np.sum(slices)
 
         # ... and store the normalised KDE curve in class variables for later use
+        self.kdey = kde_line
         self.kdex = xgrid
-        self.kdey = kde_line / integral
         self.kde = kde
+        self.kdey = self.kdey / integral
+        
+
+        # If we were working on a log scale, we need to reverse that
+        # transform so the data is linear again
+        if logarithmic:
+            tens = np.full_like(self.data, 10.0)
+            self.data = np.power(tens, self.data)
+            tens = np.full_like(self.kdex, 10.0)
+            self.kdex = np.power(tens, self.kdex)
+            self.xmin = np.amin(self.data)
+            self.xmax = np.amax(self.data)
+             # scale the distribution with the derivative -
+             # we transformed the x-axis so the new values have all
+             # been modified by the derivative, in this case it's a log
+             # function
+            self.kdey = self.kdey * 1.0 / (self.kdex * np.log(10.0))
 
 
         
@@ -460,8 +494,12 @@ Get the parameters and sigmas as determined by MCMC:
         # Force the limits to be a numpy array
         yr = np.asarray(ylimits)
 
+        uselogx = False
+        if loglog:
+            uselogx = True
+
         # Re-calculate the KDE data
-        self.calculate_kde()
+        self.calculate_kde(logarithmic=uselogx)
 
         # Create matplotplib objects
         fig,ax = plt.subplots()
