@@ -210,8 +210,20 @@ Get the parameters and sigmas as determined by MCMC:
         return Qvals
 
 
+    def self_check(self):
+        # Checks object self consistency and returns errors if necessary
+        if self.data is None:
+            print("WARNING: self check: data is not defined.")
+            return False
 
+        if not np.isfinite(self.data).all():
+            print("WARNING: self check: data has non-finite elements.")
+            return False
+
+        # If we get to this point, all is good
+        return True
     
+
             
     def optimal_n_bins(self) -> int:
         """Calculates the optimal number of bins from Freedman-Diaconis rule.
@@ -226,6 +238,7 @@ Get the parameters and sigmas as determined by MCMC:
             raise ValueError(
                 f"attempt to find optimal number of data points with no data defined."
                 )
+
 
         # Apply the Freedman-Diaconis calculation
         # First calculate the interquartile range of the data
@@ -420,8 +433,12 @@ Get the parameters and sigmas as determined by MCMC:
             self.data = np.log10(self.data)
             self.xmax = np.amax(self.data)
             self.xmin = np.amin(self.data)
+            pmb_bandwidth_scale = 1.0 # to be continued...
+            pmb_grid_scale = 1.0
         else:
             print("   - linear scale")
+            pmb_grid_scale = 0.1
+            pmb_bandwidth_scale = 0.01 # to be continued...
             
         #reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
 
@@ -429,8 +446,12 @@ Get the parameters and sigmas as determined by MCMC:
         # histogram.  We should check this at some point, mabye this
         # assumption is invalid.
         nx = self.optimal_n_bins()
-        slice_size=(self.xmax - self.xmin)/(nx+1)
+        slice_size=pmb_grid_scale * (self.xmax - self.xmin)/(nx+1)
         xgrid = np.arange(self.xmin, self.xmax, slice_size)
+
+        print("nx", nx)
+        print("slice size", slice_size)
+        #print("xgrid", xgrid)
 
         # Call scipy's gaussian_kde method.
         # In testing I find that a bandwidth of
@@ -439,7 +460,7 @@ Get the parameters and sigmas as determined by MCMC:
         # TODO: a parameterisation of the bandwidth method
 
         if method=="fdr":
-            kde = gaussian_kde(self.data, bw_method=slice_size, weights=self.weights)
+            kde = gaussian_kde(self.data, bw_method=pmb_bandwidth_scale*slice_size, weights=self.weights)
 
         else:
             # could be method="silverman" or method="scott"
@@ -609,8 +630,13 @@ Get the parameters and sigmas as determined by MCMC:
                 ax.plot(self.kdex, yfit, color='black', alpha=0.2, label='Population of MCMC walkers')
             else:
                 ax.plot(self.kdex, yfit, color='black', alpha=0.2)
+
+        uselogx = False
+        if loglog:
+            uselogx = True
         
-        self.calculate_kde()
+        self.calculate_kde(logarithmic=uselogx, method='fdr')
+        
         ax.plot(self.kdex, self.kdey, color='blue', label='Optimal KDE')
         if log or loglog:
             plt.yscale('log')
