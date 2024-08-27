@@ -6,6 +6,7 @@ import emtk.EventModeAnalyser.EMAnalyser as ema
 import copy
 
 import numpy as np
+import scipy.signal as spsig
 import matplotlib.pyplot as plt
 from lmfit import Model
 
@@ -60,7 +61,7 @@ class EMAnalyser:
         self.llf = None
 
         self.mcmc_parameter_values = None
-        self.mcmc_parameter_sigmas = None
+        self.mcmc_parameter_errors = None
 
         self.xmin = np.amin(self.data)
         self.xmax = np.amax(self.data)
@@ -96,7 +97,7 @@ These include:
 And to get the results of those fits:
             plot_LSE_fit()
             get_lse_param_values()
-            get_lse_param_sigmas()
+            get_lse_param_errors()
             get_lse_param_names()
 
 The last one takes the names as specified in the lmfit interface to
@@ -401,7 +402,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
 
-    def calculate_kde(self, logarithmic=True):
+    def calculate_kde(self, logarithmic=True, method="fdr"):
         """ Computes the kernel density estimate of the weighted events.
         Uses scipy's KDE method.  Scikit learn has more options for kernels,
         but scipy has weighted points.  Some of the code here is legacy from
@@ -415,14 +416,12 @@ Get the parameters and sigmas as determined by MCMC:
         # If a logarithmic x-axis is requested, then the data must be
         # put on a logarithmic axis first
         if logarithmic:
-            print("   logarithmic binning")
+            print("   - logarithmic scale conversion")
             self.data = np.log10(self.data)
             self.xmax = np.amax(self.data)
             self.xmin = np.amin(self.data)
-            print("   range", self.xmin, self.xmax, "on log scale")
         else:
-            print("   linear binning")
-            print("   range", self.xmin, self.xmax, "on linear scale")
+            print("   - linear scale")
             
         #reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
 
@@ -430,19 +429,22 @@ Get the parameters and sigmas as determined by MCMC:
         # histogram.  We should check this at some point, mabye this
         # assumption is invalid.
         nx = self.optimal_n_bins()
-        slic=(self.xmax - self.xmin)/(nx+1)
-        xgrid = np.arange(self.xmin, self.xmax, slic)
+        slice_size=(self.xmax - self.xmin)/(nx+1)
+        xgrid = np.arange(self.xmin, self.xmax, slice_size)
 
         # Call scipy's gaussian_kde method.
         # In testing I find that a bandwidth of
         # 20x the histogram bin width looks right on a linear binning
 
         # TODO: a parameterisation of the bandwidth method
+
+        if method=="fdr":
+            kde = gaussian_kde(self.data, bw_method=slice_size, weights=self.weights)
+
+        else:
+            # could be method="silverman" or method="scott"
+            kde = gaussian_kde(self.data, bw_method=method, weights=self.weights)
         
-        kde = gaussian_kde(self.data, bw_method="scott", weights=self.weights)
-        #kde = gaussian_kde(self.data, bw_method="silverman", weights=self.weights)
-        
-        #kde = gaussian_kde(self.data, bw_method=slic, weights=self.weights)
         # xgrid_reshape = xgrid.reshape(-1, 1) # scikit learn again
         kde_line = kde.evaluate(xgrid)
 
@@ -484,7 +486,7 @@ Get the parameters and sigmas as determined by MCMC:
 
         
         
-    def plot_kde(self, ylimits=[None, None], log=True, loglog=True, xlabel='Q (Å$^{-1}$)'):
+    def plot_kde(self, ylimits=[None, None], log=True, loglog=True, xlabel='Q (Å$^{-1}$)', method='fdr'):
         """ Plots the kernel density estimate of the data set.
         Setting ylimits adds a manual range to the plot on the y-axis.
         Setting log=True plots the y-axis on a log scale.
@@ -499,7 +501,7 @@ Get the parameters and sigmas as determined by MCMC:
             uselogx = True
 
         # Re-calculate the KDE data
-        self.calculate_kde(logarithmic=uselogx)
+        self.calculate_kde(logarithmic=uselogx, method=method)
 
         # Create matplotplib objects
         fig,ax = plt.subplots()
@@ -754,7 +756,7 @@ Get the parameters and sigmas as determined by MCMC:
         return vals
 
 
-    def get_lse_param_sigmas(self) -> np.ndarray:
+    def get_lse_param_errors(self) -> np.ndarray:
         """ returns numpy array of sigma values for the fit parameters
         from lmfit.
         """
@@ -838,7 +840,7 @@ Get the parameters and sigmas as determined by MCMC:
 
 
     
-    def MCMC_fit(self, nburn=50, niter=200, convergence="None"):
+    def MCMC_fit(self, nburn=100, niter=200, convergence="None"):
         """Performs the weighted MCMC fit of the event data.
 
         nburn is the number of iterations to use for burn-in.
@@ -1010,9 +1012,15 @@ Get the parameters and sigmas as determined by MCMC:
 
             
                 
-    def get_MCMC_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_MCMC_parameters(self, method='mean') -> Tuple[np.ndarray, np.ndarray]:
         """Returns the mean and standard deviation of each parameter as
         determined by MCMC.  The results are returned as a tuple.
+        
+        parameters:
+            mode:
+                (string) can be 'mean' or 'mode'.  Mode discards lowest
+                histogram quartile entries to eliminate the skew caused by broad tails,
+                but this of course only applies to the central value, not the error bar
 
         """
 
@@ -1024,26 +1032,58 @@ Get the parameters and sigmas as determined by MCMC:
 
         # initialise the result arrays
         self.mcmc_parameter_values = np.zeros(self.ndim)
-        self.mcmc_parameter_sigmas = np.zeros(self.ndim)
+        self.mcmc_parameter_errors = np.zeros(self.ndim)
 
         # Figure out how many parameters there are
         rge = range(self.ndim)
 
         # For each parameter, get the mean and standard error from the markov chain samples
         for i in rge:
-            # The parameter value is the mean of each parameter dimension
-            # in the chain
-            self.mcmc_parameter_values[i] = np.mean(samples[:,i])
-            # The standard error is the standard deviation of each parameter
-            # dimension in the chain divided by the square root of the
-            # number of samples
-            self.mcmc_parameter_sigmas[i] = np.std(samples[:,i])/rootn
+            if method=='peak':
+                # construct a histogram and extract the mode (peak) from it
+                hst=np.histogram(samples[:,i], bins='fd')
+                peakval=np.amax(hst[0])
+                peakind=np.where(hst[0]==peakval)[0][0]
+                peakx=hst[1][peakind]
+
+                self.mcmc_parameter_values[i] = peakx
+
+                # Use scipy signal to extract the FWHM of the peak
+                sigdat = hst[0]
+                peaks, _ = spsig.find_peaks(sigdat)
+                widths = spsig.peak_widths(sigdat, peaks, rel_height=0.5)
+                
+                prominences = spsig.peak_prominences(sigdat, peaks)
+                maxprom = np.amax(prominences[0])
+                maxind = np.where(prominences[0]==maxprom)[0][0]
+                fwhm = widths[0][maxind]
+
+                # fwhm = 2 root 2 ln 2 times sigma
+
+                sigma = fwhm / 2.0 * np.sqrt(2.0 * np.log(2.0))
+
+                stderr = sigma / rootn
+                
+                self.mcmc_parameter_errors[i] = stderr
+
+            else: # mode='mean'
+                # The parameter value is the mean of each parameter dimension
+                # in the chain
+                self.mcmc_parameter_values[i] = np.mean(samples[:,i])
+
+                # The standard error is the standard deviation of each parameter
+                # dimension in the chain divided by the square root of the
+                # number of samples
+            
+                self.mcmc_parameter_errors[i] = np.std(samples[:,i])/rootn
 
         # Return the means and standard deviations as a tuple
-        return self.mcmc_parameter_values, self.mcmc_parameter_sigmas
+        return self.mcmc_parameter_values, self.mcmc_parameter_errors
 
 
-    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False):
+    
+
+    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False, method='mean'):
         """Plots the distribution of the <item>th parameter sampled by MCMC.
         This can be useful to see the quality of the convergence for the
         parameter in question.  Specifically we are interested to know:
@@ -1071,10 +1111,15 @@ Get the parameters and sigmas as determined by MCMC:
                 f"attempt to analyse a parameter with an index that is out of the range of the number of available parameters."
                 )
 
+        pvals, svals = self.get_MCMC_parameters(method=method)
+
         # Get the mean and standard deviation of the markov chain samples
-        p_mean = np.mean(samps[:,item])
-        p_stddev = np.std(samps[:,item])
-    
+        #p_mean = np.mean(samps[:,item])
+        #p_stddev = np.std(samps[:,item])
+
+        p_mean = pvals[item]
+        p_stddev = svals[item]
+        
         # calculate the size graphical error bar to put on the plot
         barmin = p_mean - p_stddev
         barmax = p_mean + p_stddev
@@ -1082,7 +1127,7 @@ Get the parameters and sigmas as determined by MCMC:
         # We might also like to compare against least squares, so lets get those results
         lsp = np.asarray(self.least_squares_parameters)
         if compare:
-            lsee = self.get_lse_param_sigmas()
+            lsee = self.get_lse_param_errors()
             # that produces warnings if the fit is not defined / not good
             # only run it if we actually want to do the comparison
 
