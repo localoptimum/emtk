@@ -104,6 +104,7 @@ class LorentzianCurve(base.Curve):
         """Returns the basic likelihood curve for a Lorentzian function.
 
         """
+        params = np.asarray(params)
         dat = np.asarray(dat)
 
         xx = dat
