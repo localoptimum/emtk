@@ -173,8 +173,23 @@ To see a convergence trace of all parameters:
 Get the parameters and sigmas as determined by MCMC:
 
             pvals, sigs = ema2.get_MCMC_parameters()
+
+The standard method (method=mean) assumes that the parameter distribution is a 
+normal distribution / gaussian with a central mean and a standard
+deviation from which the parameter value and standard error can be 
+easily computed.  It could be that the distribution is sharply peaked
+with long tails either side, which will throw off the mean and standard error
+significantly if the tails are asymmetric.  Therefore, you can pass method='peak'
+which uses scipy signal analysis to extract the most prominent peak and estimate
+its FWHM, from which the standard error is extracted assuming that little part, at
+least, is roughly gaussian even if the tails are something else.  In other words:
+
+            pvals, sigs = ema2.get_MCMC_parameters(method='peak')
             
-         
+Personally, I found that in testing the mean method works just fine, but as soon
+as you throw real data at this then the peak method was more reliable for the examples
+that I was working on.
+
 
 """
 
