@@ -752,8 +752,7 @@ that I was working on.
     def lse_fit(self):
         """ Calls lmfit to find a least squares fit to the pmf model.
         """
-        if self.histx.any() is None or self.histy.any() is None:
-            self.calculate_histogram()
+        self.calculate_histogram()
 
         if self.least_squares_model is None:
             raise ValueError(
