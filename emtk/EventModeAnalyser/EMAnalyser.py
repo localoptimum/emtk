@@ -582,7 +582,7 @@ that I was working on.
 
         flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
 
-        inds = np.random.randint(len(flat_samples), size=30)
+        inds = np.random.choice(len(flat_samples), size=30, replace=False)
 
         plt.rcParams["figure.figsize"] = (5.75,3.5)
         fig, ax = plt.subplots()
@@ -628,7 +628,7 @@ that I was working on.
         """
         flat_samples = self.sampler.get_chain(discard=100, thin=15, flat=True)
 
-        inds = np.random.randint(len(flat_samples), size=30)
+        inds = np.random.choice(len(flat_samples), size=30, replace=False)
         pt_sum = np.sum(self.kdey)
 
         plt.rcParams["figure.figsize"] = (5.75,3.5)
