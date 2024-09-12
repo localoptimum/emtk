@@ -1098,6 +1098,8 @@ that I was working on.
                 maxind = np.where(prominences[0]==maxprom)[0][0]
                 fwhm = widths[0][maxind]
 
+                print('fwhm', fwhm)
+
                 # fwhm = 2 root 2 ln 2 times sigma
 
                 sigma = fwhm / 2.0 * np.sqrt(2.0 * np.log(2.0))
@@ -1114,8 +1116,10 @@ that I was working on.
                 # The standard error is the standard deviation of each parameter
                 # dimension in the chain divided by the square root of the
                 # number of samples
+                stdd = np.std(samples[:,i])
+                print('stdd', stdd)
             
-                self.mcmc_parameter_errors[i] = np.std(samples[:,i])/rootn
+                self.mcmc_parameter_errors[i] = stdd/rootn
 
         # Return the means and standard deviations as a tuple
         return self.mcmc_parameter_values, self.mcmc_parameter_errors
@@ -1123,7 +1127,7 @@ that I was working on.
 
     
 
-    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False, method='mean'):
+    def plot_MCMC_parameter_distribution(self, item, compare=False, log=False, loglog=False, method='mean', savename=''):
         """Plots the distribution of the <item>th parameter sampled by MCMC.
         This can be useful to see the quality of the convergence for the
         parameter in question.  Specifically we are interested to know:
@@ -1158,11 +1162,13 @@ that I was working on.
         #p_stddev = np.std(samps[:,item])
 
         p_mean = pvals[item]
-        p_stddev = svals[item]
+        p_stderr = svals[item]
+
+        print(p_mean, '+/-', p_stderr, 'using method', method)
         
         # calculate the size graphical error bar to put on the plot
-        barmin = p_mean - p_stddev
-        barmax = p_mean + p_stddev
+        barmin = p_mean - p_stderr
+        barmax = p_mean + p_stderr
 
         # We might also like to compare against least squares, so lets get those results
         lsp = np.asarray(self.least_squares_parameters)
@@ -1199,8 +1205,13 @@ that I was working on.
         # Create a text label from the MCMC result
         fittxt = "MCMC value " + str(round(p_mean,4))
 
+
         # Make a histogram of the data points
-        hst=plt.hist(samps[:,item], bins='auto', color='k', histtype="step")
+        hst = np.histogram(samps[:,item], bins='fd')
+        #hst=plt.hist(samps[:,item], bins='auto', color='k', histtype="step")
+        hx = hst[1]
+        hx = hx[:-1]
+        plt.step(hx, hst[0], where='mid')
         # figure out the maximum y value of that histogram
         ytop = np.amax(hst[0])
         # Label the axes accordingly with the previously established texts
@@ -1227,6 +1238,9 @@ that I was working on.
 
         if loglog:
             plt.yscale('log')
+
+        if savename != '':
+            plt.savefig(savename, bbox_inches='tight')
 
         # Show the plot
         plt.show()
