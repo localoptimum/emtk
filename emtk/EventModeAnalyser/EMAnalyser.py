@@ -388,7 +388,7 @@ that I was working on.
         plt.tight_layout()
         plt.legend()
         if save != "":
-            plt.savefig(fname=save)
+            plt.savefig(fname=save, dpi=600, bbox_inches='tight')
 
         plt.show()
 
@@ -425,7 +425,7 @@ that I was working on.
         plt.tight_layout()
         plt.legend()
         if save != "":
-            plt.savefig(fname=save)
+            plt.savefig(fname=save, dpi=600, bbox_inches='tight')
         plt.show()
 
 
@@ -614,7 +614,7 @@ that I was working on.
         plt.legend()
 
         if save != "":
-            plt.savefig(fname=save)
+            plt.savefig(fname=save, dpi=600, bbox_inches='tight')
 
         plt.show()
 
@@ -663,7 +663,7 @@ that I was working on.
         plt.legend()
 
         if save != "":
-            plt.savefig(fname=save)
+            plt.savefig(fname=save, dpi=600, bbox_inches='tight')
 
         plt.show()
 
@@ -1240,7 +1240,7 @@ that I was working on.
             plt.yscale('log')
 
         if savename != '':
-            plt.savefig(savename, bbox_inches='tight')
+            plt.savefig(savename, dpi=600, bbox_inches='tight')
 
         # Show the plot
         plt.show()
