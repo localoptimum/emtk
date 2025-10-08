@@ -828,24 +828,47 @@ that I was working on.
         
         return sigmas
 
+
+
+
+
+    
+    def shuffle(self):
+        # Shuffles the data
+        # In case there is something systematically wrong and you want to smoothe over that
+        perm = np.arange(self.data.size)
+        np.random.shuffle(perm)
+        
+        ndata = self.data[perm]
+        nweights = self.weights[perm]
+
+        self.data = ndata
+        self.weights = nweights
+        
     
 
-    def subsample(self, subsample_size: int) -> Self:
-        # Randomly subsamples the events to a smaller data size.
+    def subsample(self, subsample_size: int, randomize=True) -> Self:
+        # Subsamples the events to a smaller data size.
         # Returns a deep copy of the object.
 
         # Make a deep copy of the self object
         copyobj = copy.deepcopy(self)
 
         if subsample_size < copyobj.n_events:
-            # Choose a random subset of the data elements
-            rng = np.random.default_rng()
-            elements = rng.choice(copyobj.n_events, subsample_size)
+            if randomize:
+                # Choose a random subset of the data elements
+                print("Subsampling randomly without replacements.")
+                rng = np.random.default_rng()
+                elements = rng.choice(copyobj.n_events, subsample_size, replace=False)
+            else:
+                # Take the first elements in order
+                print("Subsampling in order.")
+                elements = np.arange(subsample_size)
 
             # get a local copy of those data elements
             subsample = copyobj.data[elements]
             subweights = copyobj.weights[elements]
-
+ 
             # Write them over to the copy object
             copyobj.data = subsample
             copyobj.weights = subweights
