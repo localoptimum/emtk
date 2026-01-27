@@ -339,8 +339,11 @@ that I was working on.
         # Force the shape of the plot to be close to scipp for convenient comparisons.
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
+        # Step plot with mid needs to be shifted by half a bin
+        xshift = self.histx + 0.5*(self.histx[1]-self.histx[0])
+
         # Plot the histogram as a step plot
-        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        plt.step(xshift, self.histy, where='mid', label='Optimal Histo')
 
         # Maybe make the graph a log plot or log-log plot as appropriate
         if log or loglog:
@@ -430,7 +433,7 @@ that I was working on.
 
 
 
-    def calculate_kde(self, logarithmic=True, method="fdr"):
+    def calculate_kde(self, logarithmic=True, method="pmb"):
         """ Computes the kernel density estimate of the weighted events.
         Uses scipy's KDE method.  Scikit learn has more options for kernels,
         but scipy has weighted points.  Some of the code here is legacy from
@@ -440,6 +443,7 @@ that I was working on.
         """
         
         print("Calculating KDE")
+        print("Using", method, "method")
 
         # If a logarithmic x-axis is requested, then the data must be
         # put on a logarithmic axis first
@@ -452,16 +456,20 @@ that I was working on.
             pmb_grid_scale = 1.0
         else:
             print("   - linear scale")
-            pmb_grid_scale = 0.1
-            pmb_bandwidth_scale = 0.01 # to be continued...
-            
+            pmb_grid_scale = 1.0 # 0.1
+            pmb_bandwidth_scale = 1.0 # 0.01 # to be continued...
+
+                
         #reshaped = self.data.reshape(-1, 1) # sklearn needs this for some reason
 
         # Compute optimal number of grid points in the same way as for
         # histogram.  We should check this at some point, mabye this
         # assumption is invalid.
         nx = self.optimal_n_bins()
-        slice_size=pmb_grid_scale * (self.xmax - self.xmin)/(nx+1)
+        # Unlike a histogram, we can force a minimum number of points
+        if nx < 200:
+            nx = 200
+        slice_size = (self.xmax - self.xmin)/(nx+1)
         xgrid = np.arange(self.xmin, self.xmax, slice_size)
 
         print("nx", nx)
@@ -474,8 +482,10 @@ that I was working on.
 
         # TODO: a parameterisation of the bandwidth method
 
-        if method=="fdr":
-            kde = gaussian_kde(self.data, bw_method=pmb_bandwidth_scale*slice_size, weights=self.weights)
+        pmb_bandwidth = slice_size / 100.0
+
+        if method=="pmb":
+            kde = gaussian_kde(self.data, bw_method=pmb_bandwidth, weights=self.weights)
 
         else:
             # could be method="silverman" or method="scott"
@@ -522,11 +532,13 @@ that I was working on.
 
         
         
-    def plot_kde(self, ylimits=[None, None], log=True, loglog=True, xlabel='Q (Å$^{-1}$)', method='fdr'):
+    def plot_kde(self, ylimits=[None, None], log=True, loglog=True, xlabel='Q (Å$^{-1}$)', method='pmb'):
         """ Plots the kernel density estimate of the data set.
         Setting ylimits adds a manual range to the plot on the y-axis.
         Setting log=True plots the y-axis on a log scale.
         Setting loglog=True plots the y- and x-axes on a log scale.
+        fdr works well for SANS
+        scott / silverman works well for inelastic scattering
         
         """
         # Force the limits to be a numpy array
@@ -650,7 +662,7 @@ that I was working on.
         if loglog:
             uselogx = True
         
-        self.calculate_kde(logarithmic=uselogx, method='fdr')
+        self.calculate_kde(logarithmic=uselogx, method='pmb')
         
         ax.plot(self.kdex, self.kdey, color='blue', label='Optimal KDE')
         if log or loglog:
