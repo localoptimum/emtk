@@ -766,10 +766,29 @@ that I was working on.
         """
         self.calculate_histogram()
 
+        sy = self.histy.size
+        sx = self.histx.size
+        npars = len(self.least_squares_parameters.valuesdict())
+
+        # This error is already in the scipy code but their error message is cryptic BS.
+        if npars > sx:
+            raise ValueError(
+                f"Number of least squares parameters {npars} cannot be larger than the number of data points {sx}.  Increase the number of data points first."
+                )
+        
+        shy = self.histy.shape
+        shx = self.histx.shape
+        
         if self.least_squares_model is None:
             raise ValueError(
                 f"attempt to fit events with an undefined model.  Define the model function first."
                 )
+
+        if sy != sx:
+            raise ValueError(
+                f"Y array size {sy} does not equal X array size {sx}."
+                )
+
         
         self.lse_result = self.least_squares_model.fit(self.histy, self.least_squares_parameters, x=self.histx)
 
