@@ -312,6 +312,10 @@ that I was working on.
         x_hist = hst[1]
         x_hist = x_hist[:-1]
 
+        #Apply Thomas' shift.  Now we need to plot at the mid point of the x value
+        #rather than the "pre" point with matplotlib.step
+        x_hist = x_hist + 0.5*(x_hist[1] - x_hist[0])
+
         # Grab the y values
         y_hist = hst[0]
 
@@ -375,7 +379,7 @@ that I was working on.
         plt.rcParams["figure.figsize"] = (5.75,3.5)
 
         # Plot the histogram as a matplotlib step plot
-        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        plt.step(self.histx, self.histy, where='mid', label='Optimal Histo')
         # Plot the fit as a regular matplotlib plot
         plt.plot(self.histx, self.lse_result.best_fit, color='black', label="LSE fit")
 
@@ -412,7 +416,7 @@ that I was working on.
         evaly = self.least_squares_model.eval(x=self.histx, params=self.least_squares_parameters)
 
         # Plot the histogram as a matplotlib step plot
-        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        plt.step(self.histx, self.histy, where='mid', label='Optimal Histo')
         # Plot the fit as a regular matplotlib plot
         plt.plot(self.histx, evaly, color='black', label="LSE starting parameters")
 
@@ -615,7 +619,7 @@ that I was working on.
             else:
                 ax.plot(self.histx, yfit, color='black', alpha=0.2)
         
-        plt.step(self.histx, self.histy, where='post', label='Optimal Histo')
+        plt.step(self.histx, self.histy, where='mid', label='Optimal Histo')
         if log or loglog:
             plt.yscale('log')
         if log:
