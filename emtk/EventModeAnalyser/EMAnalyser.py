@@ -870,10 +870,13 @@ that I was working on.
     
     def shuffle(self):
         # Shuffles the data
-        # In case there is something systematically wrong and you want to smoothe over that
+        # In case there is something systematically wrong with the input data
+        # e.g. the points arrive in blocks and not randomly,
+        # and you want to smooth over that
         perm = np.arange(self.data.size)
         np.random.shuffle(perm)
-        
+
+        # The event weights need to be shuffled identically
         ndata = self.data[perm]
         nweights = self.weights[perm]
 
@@ -938,7 +941,7 @@ that I was working on.
 
 
     
-    def MCMC_fit(self, nburn=100, niter=200, convergence="None"):
+    def MCMC_fit(self, nburn=100, niter=200, convergence="None", jitter=-5):
         """Performs the weighted MCMC fit of the event data.
 
         nburn is the number of iterations to use for burn-in.
@@ -997,9 +1000,11 @@ that I was working on.
             nwk = 2*ndm+1
             self.nwalkers = nwk
 
+        jitterScale = 10.0**jitter
+
         # Create a spread of randomised starting points for each walker, that is
         # clustered around the seed position
-        p0 = [p0 + 1e-5 * np.random.randn(self.ndim) for k in range(self.nwalkers)]
+        p0 = [p0 + jitterScale * np.random.randn(self.ndim) for k in range(self.nwalkers)]
 
             
         # If the weights array is badly defined or not defined, use unity weights.
