@@ -4,10 +4,12 @@ import h5py
 import numpy as np
 import scipy as sp
 
+import matplotlib.pyplot as plt
+
 RANDOM_SEED = 0
 np.random.seed(seed=RANDOM_SEED)
 
-import lmfit 
+from lmfit import Model 
 
 from scipy.stats import cauchy
 from scipy.stats import norm
@@ -31,14 +33,24 @@ import multiprocessing as mp
 Pool = mp.get_context('fork').Pool
 
 
-emcee_walkers = 128
-emcee_burn = 20
-emcee_iterations = 40
+emcee_walkers = 64
+emcee_burn = 10
+emcee_iterations = 20
+
+num_boots = 10
 
 subsample_size = 45000
 
+lsMinEvents = 50000
+mcmcMinEvents = 1000000000 #10
+lsMaxEvents = 10000000
+mcmcMaxEvents = 500 #110000
+
 parallel = True
 
+testRun = False
+
+verbose = False
 
 def loadRawARCS(number):
     ldpath="/Users/phillipbentley/Code/python/mle/data/SNS/ARCS/ZrH2/IPTS-27751/nexus"
@@ -168,51 +180,103 @@ events = evs[perm]
 weights= wts[perm]
 
 sube = events[1:subsample_size-1]
-subw = events[1:subsample_size-1]
+subw = weights[1:subsample_size-1]
 
 
 xmin = np.amin(sube)
 xmax = np.amax(sube)
 
 
-def big_lse_pdf(x, amplitude, elmu, mu1, mu2, mu3, mu4, mubg1, mubg2, elsigma, s1, s2, s3, s4, sbg1, sbg2, me, m1, m2, m3, m4, mbg1):
+
+
+
+def optimal_n_bins(data) -> int:
+    """Calculates the optimal number of bins from Freedman-Diaconis rule.
+        See for example:
+        https://stats.stackexchange.com/questions/798/calculating-optimal-number-of-bins-in-a-histogram
+        https://en.wikipedia.org/wiki/Freedman–Diaconis_rule
     
-    mvals = ema1.simplex_weights(np.array([me, m1, m2, m3, m4, mbg1]))
-
-    el = mvals[0] * norm.pdf(x, scale=elsigma, loc=elmu) / gaussian_integral(xmin, xmax, elsigma)
-
-    l1 = mvals[1] * norm.pdf(x, scale=s1, loc=mu1) / gaussian_integral(xmin, xmax, mu1, s1)
-    l2 = mvals[2] * norm.pdf(x, scale=s2, loc=mu2) / gaussian_integral(xmin, xmax, mu2, s2)
-    l3 = mvals[3] * norm.pdf(x, scale=s3, loc=mu3) / gaussian_integral(xmin, xmax, mu3, s3)
-    l4 = mvals[4] * norm.pdf(x, scale=s4, loc=mu4) / gaussian_integral(xmin, xmax, mu4, s4)
-    bg1= mvals[5] * norm.pdf(x, scale=sbg1, loc=mubg1) / gaussian_integral(xmin, xmax, mubg1, sbg1)
-    bg2= mvals[6] * cauchy.pdf(x, scale=sbg2, loc=mubg2) / cauchy_integral(xmin, xmax, sbg2)
+        """
     
-    sol = amplitude * (el + l1 + l2 + l3 + l4 + bg1 + bg2)
+    # Protect against calling when there are no data points
+    if data is None:
+        raise ValueError(
+            f"attempt to find optimal number of data points with no data defined."
+        )
+
+    #  Get the range of values for the events
+    xmin=np.amin(data)
+    xmax=np.amax(data)
+    n_events = data.size
     
-    return sol
-
-def big_background_pdf(x, amplitude, elmu, mu1, mu2, mu3, mu4, mubg1, mubg2, elsigma, s1, s2, s3, s4, sbg1, sbg2, me, m1, m2, m3, m4, mbg1):
-
-    mvals = ema1.simplex_weights(np.array([me, m1, m2, m3, m4, mbg1]))
-
-    bg1= mvals[5] * norm.pdf(x, scale=sbg1, loc=mubg1) / gaussian_integral(xmin, xmax, mubg1, sbg1)
-    bg2= mvals[6] * cauchy.pdf(x, scale=sbg2, loc=mubg2) / cauchy_integral(xmin, xmax, sbg2)
+    # Apply the Freedman-Diaconis calculation
+    # First calculate the interquartile range of the data
+    iqr = np.subtract(*np.percentile(data, [75, 25]))
     
-    sol = amplitude * (bg1 + bg2)
+    # If all the data points are equal (or maybe there is only one data point)
+    # then the IQR is zero and that makes no sense for anything that comes after
+    if iqr == 0.0:
+        print("WARNING: interquartile range is zero.")
+        return 0
     
-    return sol
-
-
-#ema1.plot_LSE_initial(loglog=False, log=False)
-
-#ema1.plot_LSE_fit(loglog=False, log=False, xlabel='meV', save="/Users/phillipbentley/Code/python/mle/arcs_lse_fit.png")
+    # If we get to this point it's probably OK, return the Freedman-Diaconis value
+    return int((xmax - xmin)*n_events**(1.0/3.0)/(2.0*iqr))
 
 
 
-#ema1.shuffle() 
 
-#cpo = ema1.subsample(45000, randomize=False)
+
+def calculate_histogram(data, weights=None):
+    """Calculates a histogram of the weighted events using
+        numpy.histogram.  Just prepares the data, does not plot.  The
+        actual plotting is done by plot_histogram().
+    
+        """
+
+    # Protect against no data points
+    if data is None:
+        raise ValueError(
+            f"attempt to compute histogram with no data defined."
+        )
+    
+    # If we get here, we have events
+    
+    #  Get the range of values for the events
+    xmin=np.amin(data)
+    xmax=np.amax(data)
+    
+    # Calculate the optimum number of histogram bins
+    opt_n_bin = optimal_n_bins(data)
+    
+    # Create that number of bins spanning the range of event values
+    slic=(xmax - xmin)/(opt_n_bin+1)
+    hbins = np.arange(xmin, xmax, slic)
+    
+    # Maybe the events are weighted, maybe they aren't.  Handle both scenarios.
+    if weights is None:
+        hst = np.histogram(data, bins=hbins, density=True)
+    else:
+        hst = np.histogram(data, bins=hbins, density=True, weights=weights)
+        
+    # The way that numpy makes histograms is not x-y pairs but x bins
+    # We'll remove the last point and plot the histogram as a matplotlib step
+    # later
+    x_hist = hst[1]
+    x_hist = x_hist[:-1]
+    
+    #Apply Thomas' shift.  Now we need to plot at the mid point of the x value
+    #rather than the "pre" point with matplotlib.step
+    x_hist = x_hist + 0.5*(x_hist[1] - x_hist[0])
+    
+    # Grab the y values
+    y_hist = hst[0]
+    
+    # Error values are square root of y values (poisson statistics)
+    e_hist = np.sqrt(y_hist)
+    
+    return x_hist, y_hist, e_hist
+
+
 
 
 
@@ -404,6 +468,62 @@ def log_likelihood_function(theta, data, xmin, xmax, pweights, mylpf, verbose=Fa
     return result
 
 
+def big_lse_pdf(x, amplitude, elmu, mu1, mu2, mu3, mu4, mubg1, mubg2, elsigma, s1, s2, s3, s4, sbg1, sbg2, me, m1, m2, m3, m4, mbg1):
+    
+    mvals = simplex_weights(np.array([me, m1, m2, m3, m4, mbg1]))
+
+    el = mvals[0] * norm.pdf(x, scale=elsigma, loc=elmu) / gaussian_integral(xmin, xmax, elsigma)
+
+    l1 = mvals[1] * norm.pdf(x, scale=s1, loc=mu1) / gaussian_integral(xmin, xmax, mu1, s1)
+    l2 = mvals[2] * norm.pdf(x, scale=s2, loc=mu2) / gaussian_integral(xmin, xmax, mu2, s2)
+    l3 = mvals[3] * norm.pdf(x, scale=s3, loc=mu3) / gaussian_integral(xmin, xmax, mu3, s3)
+    l4 = mvals[4] * norm.pdf(x, scale=s4, loc=mu4) / gaussian_integral(xmin, xmax, mu4, s4)
+    bg1= mvals[5] * norm.pdf(x, scale=sbg1, loc=mubg1) / gaussian_integral(xmin, xmax, mubg1, sbg1)
+    bg2= mvals[6] * cauchy.pdf(x, scale=sbg2, loc=mubg2) / cauchy_integral(xmin, xmax, sbg2)
+    
+    sol = amplitude * (el + l1 + l2 + l3 + l4 + bg1 + bg2)
+    
+    return sol
+
+def big_background_pdf(x, amplitude, elmu, mu1, mu2, mu3, mu4, mubg1, mubg2, elsigma, s1, s2, s3, s4, sbg1, sbg2, me, m1, m2, m3, m4, mbg1):
+
+    mvals = simplex_weights(np.array([me, m1, m2, m3, m4, mbg1]))
+
+    bg1= mvals[5] * norm.pdf(x, scale=sbg1, loc=mubg1) / gaussian_integral(xmin, xmax, mubg1, sbg1)
+    bg2= mvals[6] * cauchy.pdf(x, scale=sbg2, loc=mubg2) / cauchy_integral(xmin, xmax, sbg2)
+    
+    sol = amplitude * (bg1 + bg2)
+    
+    return sol
+
+
+
+
+least_squares_model = Model(big_lse_pdf)
+least_squares_parameters = least_squares_model.make_params(amplitude=dict(value=1.0, min=0.0),\
+    elmu = dict(value=2.0, min=-100.0, max=100.0),\
+    mu1 = dict(value=145.0, min=100.0, max=200.0),\
+    mu2 = dict(value=280.0, min=200.0, max=350.0),\
+    mu3 = dict(value=420.0, min=350.0, max=450.0),\
+    mu4 = dict(value=560.0, min=500.0, max=620.0),\
+    mubg1=dict(value=620.0, min=600.0, max=700.0),\
+    mubg2=dict(value=140.0, min=0.0, max=200.0),\
+
+    elsigma = dict(value=20.0, min=10.0, max=100.0),\
+    s1 = dict(value=30.0, min=10.0, max=100.0),\
+    s2 = dict(value=30.0, min=10.0, max=100.0),\
+    s3 = dict(value=30.0, min=10.0, max=100.0),\
+    s4 = dict(value=30.0, min=10.0, max=100.0),\
+    sbg1=dict(value=105.0, min=100.0, max=250.0),\
+    sbg2=dict(value=105.0, min=100.0, max=250.0),\
+    me=dict(value=0.11, min=0.01, max = 1.0),\
+    m1=dict(value=0.11, min=0.01, max = 1.0),\
+    m2=dict(value=0.11, min=0.01, max = 1.0),\
+    m3=dict(value=0.11, min=0.01, max = 1.0),\
+    m4=dict(value=0.11, min=0.01, max = 1.0),\
+    mbg1=dict(value=0.11, min=0.01, max=1.0))
+
+
 same_as_least_squares = np.array([2.0, 145.0, 280.0, 420.0, 560.0,\
                                  620.0, 140.0, 20.0, 30.0, 30.0,\
                                  30.0, 30.0, 105.0, 105.0,\
@@ -411,28 +531,32 @@ same_as_least_squares = np.array([2.0, 145.0, 280.0, 420.0, 560.0,\
 
 
 p0 = np.asarray(same_as_least_squares)
-
 p0 = [p0 + (10.0 ** -2) * np.random.randn(same_as_least_squares.size) for k in range(emcee_walkers)]
 
-if parallel == False:
-    start = time.time()
-    print("Time started", start)
-    sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, threads=4, args=[sube, xmin, xmax, subw, log_prior_function])
-    print("Burn in:")
-    sampler_state = sampler.run_mcmc(p0, emcee_burn, progress=True)
-    sampler.reset()
-    print("Sampling:")
-    sampler_state = sampler.run_mcmc(sampler_state, emcee_iterations, progress=True)
-    print("MCMC sampling complete.")
-    end = time.time()
-    print("Time finished", end)
-    single_time = end - start
-    print("Single EMCEE run took {0:.1f} seconds".format(single_time))
-else:
-    with Pool() as pool:
+if testRun == True:
+
+    print("Running a single iteration test run.")
+    
+    histx, histy, histe = calculate_histogram(sube, subw)
+
+    lse_result = least_squares_model.fit(histy, least_squares_parameters, weights=histe, x=histx)
+
+    valdict = lse_result.best_values
+    pvals = np.zeros(len(valdict))
+    
+    i = 0
+    for key in valdict:
+        pvals[i] = valdict[key]
+        i=i+1
+
+    print(pvals)
+        
+    quit()
+    
+    if parallel == False:
         start = time.time()
         print("Time started", start)
-        sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, pool=pool, args=[sube, xmin, xmax, subw, log_prior_function])
+        sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, threads=4, args=[sube, xmin, xmax, subw, log_prior_function])
         print("Burn in:")
         sampler_state = sampler.run_mcmc(p0, emcee_burn, progress=True)
         sampler.reset()
@@ -443,76 +567,194 @@ else:
         print("Time finished", end)
         single_time = end - start
         print("Single EMCEE run took {0:.1f} seconds".format(single_time))
+    else:
+        with Pool() as pool:
+            start = time.time()
+            print("Time started", start)
+            sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, pool=pool, args=[sube, xmin, xmax, subw, log_prior_function])
+            print("Burn in:")
+            sampler_state = sampler.run_mcmc(p0, emcee_burn, progress=True)
+            sampler.reset()
+            print("Sampling:")
+            sampler_state = sampler.run_mcmc(sampler_state, emcee_iterations, progress=True)
+            print("MCMC sampling complete.")
+            end = time.time()
+            print("Time finished", end)
+            single_time = end - start
+            print("Single EMCEE run took {0:.1f} seconds".format(single_time))
+
+    print("End of test run.  Quitting.")
+    quit()
 
 
 
-quit()
-                                    
-tau = cpo.sampler.get_autocorr_time()
+def get_MCMC_params(sampler):
+    samples = sampler.get_chain(flat=True)
+    ndim = same_as_least_squares.size
+    rge = range(ndim)
 
-chain = cpo.sampler.get_chain()[:, :, 0].T
+    nn = samples.shape[0]
+    rootn = np.sqrt(nn)
 
-# Automated windowing procedure following Sokal (1989)
-def auto_window(taus, c):
-    m = np.arange(len(taus)) < c * taus
-    if np.any(m):
-        return np.argmin(m)
-    return len(taus) - 1
+    mcmc_parameter_values = np.zeros(ndim)
+    mcmc_parameter_errors = np.zeros(ndim)
 
-def autocorr_new(y, c=5.0):
-    f = np.zeros(y.shape[1])
-    for yy in y:
-        f += autocorr_func_1d(yy)
-    f /= len(y)
-    taus = 2.0 * np.cumsum(f) - 1.0
-    window = auto_window(taus, c)
-    return taus[window]
+    for i in rge:
+        mcmc_parameter_values[i] = np.mean(samples[:,i])
+        stdd = np.std(samples[:,i])
+        mcmc_parameter_errors[i] = stdd/rootn        
 
-def next_pow_two(n):
-    i = 1
-    while i < n:
-        i = i << 1
-    return i
+    return mcmc_parameter_values, mcmc_parameter_errors
 
-# Following the suggestion from Goodman & Weare (2010)
-def autocorr_gw2010(y, c=5.0):
-    f = autocorr_func_1d(np.mean(y, axis=0))
-    taus = 2.0 * np.cumsum(f) - 1.0
-    window = auto_window(taus, c)
-    return taus[window]
 
-def autocorr_func_1d(x, norm=True):
-    x = np.atleast_1d(x)
-    if len(x.shape) != 1:
-        raise ValueError("invalid dimensions for 1D autocorrelation function")
-    n = next_pow_two(len(x))
+# Bootstrap loop to measure convergence with MC sample of variances for each step
+maxsiz = np.log10(evs.size)-1 # We do 10 trials on each step
+print("Total events:", evs.size)
+span0 = np.linspace(0, evs.size/num_boots, num_boots)
+span0 = np.round(span0).astype(int)
+print("span0:", span0)
 
-    # Compute the FFT and then (from that) the auto-correlation function
-    f = np.fft.fft(x - np.mean(x), n=2 * n)
-    acf = np.fft.ifft(f * np.conjugate(f))[: len(x)].real
-    acf /= 4 * n
 
-    # Optionally normalize
-    if norm:
-        acf /= acf[0]
+print(maxsiz)
+evreps=10
+n_evs = np.logspace(2, maxsiz, evreps).astype(int)
+print(n_evs)
+n_evs[-1]=evs.size
+print(n_evs)
 
-    return acf
+overall_lse_results = np.zeros((evreps, same_as_least_squares.size+1))
+overall_lse_errors  = np.zeros((evreps, same_as_least_squares.size+1))
+overall_mcmc_results = np.zeros((evreps, same_as_least_squares.size))
+overall_mcmc_errors = np.zeros((evreps, same_as_least_squares.size))
 
-# Compute the estimators for a few different chain lengths
-N = np.exp(np.linspace(np.log(100), np.log(chain.shape[1]), 10)).astype(int)
-gw2010 = np.empty(len(N))
-new = np.empty(len(N))
-for i, n in enumerate(N):
-    gw2010[i] = autocorr_gw2010(chain[:, :n])
-    new[i] = autocorr_new(chain[:, :n])
 
-# Plot the comparisons
-plt.loglog(N, new, "o-", label='Fardal ("New")')
-plt.loglog(N, gw2010, "s-", label="Goodman Weare")
-ylim = plt.gca().get_ylim()
-plt.plot(N, N / 50.0, "--k", label=r"$\tau = N/50$")
-plt.ylim(ylim)
-plt.xlabel("Number of samples, $N$")
-plt.ylabel(r"$\tau$ estimates")
-plt.legend(fontsize=14);
-plt.savefig('convergence/single_tau.png', dpi=600, bbox_inches='tight')
+
+
+
+rep = 0
+
+start = time.time()
+print("Time started", start)
+
+lse_result = None
+
+for nn in n_evs:
+    
+    lse_results = np.zeros((num_boots, same_as_least_squares.size+1))
+    lse_errors  = np.zeros((num_boots, same_as_least_squares.size+1))
+    mcmc_results = np.zeros((num_boots, same_as_least_squares.size))
+    mcmc_errors = np.zeros((num_boots, same_as_least_squares.size))
+    
+    for boot in range(num_boots):
+        print("Rep", rep+1, "/", evreps, "| Size ", nn, "/", evs.size, "| boot", boot, "/", num_boots)
+
+        slicestart = span0[boot]
+        sliceend = span0[boot]+nn
+        print("Subsampling [", slicestart, ":", sliceend, "]")
+        subsample_events = evs[slicestart:sliceend]
+        subsample_weights= wts[slicestart:sliceend]
+
+        p0 = np.asarray(same_as_least_squares)
+        p0 = [p0 + (10.0 ** -2) * np.random.randn(same_as_least_squares.size) for k in range(emcee_walkers)]
+        
+        if nn >= lsMinEvents and nn <= lsMaxEvents:
+            print("Least Squares Analysis...")
+
+            histx, histy, histe = calculate_histogram(subsample_events, subsample_weights)
+
+            lse_result = least_squares_model.fit(histy, least_squares_parameters, weights=histe, x=histx, method='leastsq')
+
+            valdict = lse_result.best_values
+            pvals = np.zeros(len(valdict))
+            
+            i = 0
+            for key in valdict:
+                pvals[i] = valdict[key]
+                i=i+1
+                        
+            lse_results[boot,:] = pvals
+
+        else:
+            print("   --- Skipping Least Squares Analysis")
+            
+        if nn >= mcmcMinEvents and nn <= mcmcMaxEvents:
+            print("MCMC Analysis...")
+
+            if parallel == False:
+                sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, threads=4, args=[subsample_events, xmin, xmax, subsample_weights, log_prior_function])
+                print("Burn in:")
+                sampler_state = sampler.run_mcmc(p0, emcee_burn, progress=False)
+                sampler.reset()
+                print("Sampling:")
+                sampler_state = sampler.run_mcmc(sampler_state, emcee_iterations, progress=False)
+                print("MCMC sampling complete.")
+            else:
+                with Pool() as pool:
+                    sampler = emcee.EnsembleSampler(emcee_walkers, (same_as_least_squares.size), log_likelihood_function, pool=pool, args=[subsample_events, xmin, xmax, subsample_weights, log_prior_function])
+                    print("Burn in:")
+                    sampler_state = sampler.run_mcmc(p0, emcee_burn, progress=False)
+                    sampler.reset()
+                    print("Sampling:")
+                    sampler_state = sampler.run_mcmc(sampler_state, emcee_iterations, progress=False)
+                    print("MCMC sampling complete.")
+                        
+            mcmc_results[boot,:], mcmc_errors[boot,:] = get_MCMC_params(sampler)
+            
+        else:
+            print("   --- Skipping MCMC Analysis")
+
+        if verbose:
+            print("Current bootstrap LSE grid:")
+            print(lse_results)
+
+            print("Current bootstrap MCMC grid:")
+            print(mcmc_results)
+
+    
+    # All 10 boots have now been done, copy over the mean and stddev to the overall results arrays
+    overall_mcmc_results[rep,:] = np.mean(mcmc_results, axis=0)
+    overall_mcmc_errors[rep,:] = np.std(mcmc_errors, axis=0)
+    overall_lse_results[rep,:] = np.mean(lse_results, axis=0)
+    overall_lse_errors[rep,:] = np.std(lse_results, axis=0)
+
+    if verbose:
+        print("Current overall LSE grid:")
+        print(overall_lse_results)
+        print("Current overall LSE errors:")
+        print(overall_lse_errors)
+    
+    rep = rep + 1
+                
+print("Convergence bootstrap loop complete.")
+
+if verbose:
+    print("Overall lse grid:")
+    print(overall_lse_results)
+
+end = time.time()
+print("Time finished", end)
+single_time = end - start
+print("Bootstrap cycle took {0:.1f} seconds".format(single_time))
+
+
+# Get the parameter names in the dictionary from the last LSE analysis run
+valdict = lse_result.best_values
+pnams = [None]*len(valdict)
+
+i = 0
+for key in valdict:
+    pnams[i] = key
+    i=i+1
+
+
+
+with open('arcs_parameters.npy', 'wb') as f:
+    np.save(f, n_evs)
+    np.save(f, pnams)
+    np.save(f, overall_lse_results)
+    np.save(f, overall_lse_errors)
+    np.save(f, overall_mcmc_results)
+    np.save(f, overall_mcmc_errors)
+    
+
+
